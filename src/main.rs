@@ -78,7 +78,7 @@ fn render(f:&mut  Frame<'_,CrosstermBackend<io::Stdout>>, app: App) {
     .margin(1)
     .constraints(
     match app.mode {
-        Mode::Edit =>[Constraint::Percentage(100),Constraint::Percentage(0),].as_ref(),
+        Mode::Edit =>[Constraint::Length(10),Constraint::Percentage(0),].as_ref(),
         _ => [Constraint::Percentage(70),Constraint::Percentage(30),].as_ref()
     }
     )
