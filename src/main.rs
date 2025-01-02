@@ -55,7 +55,7 @@ fn run(terminal:&mut Terminal<CrosstermBackend<io::Stdout>>) -> Result<(),Error>
                     match key.code {
                         KeyCode::Char(x) => command += &x.to_string(),
                         KeyCode::Backspace => {let _ = command.pop();},
-                        KeyCode::Enter => mode = get_mode(&command),
+                        KeyCode::Enter => {mode = get_mode(&command);command = String::new()},
                         _ => ()
                     }
                 },
@@ -78,13 +78,22 @@ fn render(f:&mut  Frame<'_,CrosstermBackend<io::Stdout>>, app: App) {
     .margin(1)
     .constraints(
     match app.mode {
-        Mode::Edit =>[Constraint::Length(10),Constraint::Percentage(0),].as_ref(),
+        Mode::Edit =>[Constraint::Percentage(100),Constraint::Percentage(0),].as_ref(),
         _ => [Constraint::Percentage(70),Constraint::Percentage(30),].as_ref()
     }
     )
     .split(f.size());
-    let input = Paragraph::new(app.input.as_ref()).block(Block::default().borders(Borders::ALL));
-    let command = Paragraph::new(vec![Spans::from(Span::raw(app.command))]).style(Style::default()).block(Block::default().borders(Borders::ALL).title("SUS"));
+    let offset: u16;
+    let mut lines:Vec<&str> = app.input.split("\n").collect();
+    lines.push("");
+    lines.push("");
+    if lines.len() > chunks[0].height as usize {
+        offset = lines.len() as u16 - chunks[0].height;
+    } else {
+        offset = 0
+    }
+    let input = Paragraph::new(app.input.as_ref()).scroll((offset,0)).block(Block::default().borders(Borders::ALL));
+    let command = Paragraph::new(vec![Spans::from(Span::raw(app.command))]).style(Style::default()).block(Block::default().borders(Borders::ALL).title("Command"));
     f.render_widget(input,chunks[0]);
     f.render_widget(command, chunks[1]);
 }
