@@ -1,4 +1,4 @@
-use std::{fmt::{format, Error}, io,thread};
+use std::{fmt::Error, io};
 use tui::{
     backend::CrosstermBackend, layout::{Constraint, Direction, Layout}, style::Style, text::{Span, Spans}, widgets::{Block, Borders, Paragraph, Widget}, Frame, Terminal
 };
@@ -57,8 +57,8 @@ fn run(terminal:&mut Terminal<CrosstermBackend<io::Stdout>>) -> Result<(),Error>
                     }
                 },
                 Mode::Edit => match key.code {
-                    KeyCode::Char(x) => {input.insert(edit_cursor, x)/*input += &x.to_string()*/;edit_cursor += 1;},
-                    KeyCode::Backspace => {if edit_cursor != 0 {if edit_cursor == input.len() {let _ = input.pop();} else {let _ = input.remove(edit_cursor);edit_cursor -= 1;}}},
+                    KeyCode::Char(x) => {if x.is_ascii() {input.insert(edit_cursor, x)/*input += &x.to_string()*/;edit_cursor += 1;}},
+                    KeyCode::Backspace => {if edit_cursor != 0 {if edit_cursor == input.len() {let _ = input.pop();} else {let _ = input.remove(edit_cursor -1);edit_cursor -= 1;}}},
                     KeyCode::Delete => {if edit_cursor != input.len() {if edit_cursor + 1 == input.len() {let _ = input.pop();} else {let _ = input.remove(edit_cursor + 1);/*edit_cursor -= 1;*/}}},
                     KeyCode::Enter => {input.insert(edit_cursor, '\n')/*input += &"\n".to_string()*/;edit_cursor;edit_cursor += 1;},
                     KeyCode::Esc => {mode = Mode::Mode},
@@ -153,27 +153,35 @@ fn line_up(input:&String,cursor: &mut usize) -> usize {
     }
     *cursor
 }
-fn line_down(input:&String,cursor: &mut usize) -> usize {
-    if *(&(&input.chars().collect::<Vec<char>>())[..*cursor].contains(&'\n')) {
-        let target_string = &(String::from_utf8(input.as_bytes()[..*cursor].to_vec())).unwrap_or(format!("{}",input));
+fn line_down(input:&String,cursor: &usize) -> usize {
+    if *(&(&input.chars().collect::<Vec<char>>())[*cursor..].contains(&'\n')) {
+        let mut current_line:usize = 0;
+        for i in (0..*cursor).rev() {
+            if input.chars().collect::<Vec<char>>()[i] != '\n'  {
+                current_line += 1
+            }else {
+                break;
+            }
+        }
+        let target_string = &(String::from_utf8(input.as_bytes()[*cursor..].to_vec())).unwrap_or(format!("{}",input));
         let mut lines = lines(target_string);
         lines.pop();
         lines.pop();
-        if let Some(last) = lines.last() {
-            if let Some(second_last) = lines.get(lines.len().wrapping_sub(2)) {
+        if let Some(last) = lines.get(0) {
+            if let Some(second_last) = lines.get(1) {
                 let mut  new_cursor:usize = 0;
-                for i in &lines[0..lines.len()-2] {
+                for i in &lines[2..] {
                     for _ in 0..i.len() {
                         new_cursor += 1;
                     }
                     new_cursor += 1;
                 }
-                if last.len() <= second_last.len() {
+                if last.len() > second_last.len() {
                     new_cursor += last.len();
                 } else {
                     new_cursor += second_last.len();
                 }
-                return new_cursor;
+                return (input.len() - new_cursor) + current_line;
             }
         }
 
