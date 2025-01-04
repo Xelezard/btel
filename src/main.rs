@@ -53,6 +53,7 @@ fn run(terminal:&mut Terminal<CrosstermBackend<io::Stdout>>) -> Result<(),Error>
                         KeyCode::Char(x) => command += &x.to_string(),
                         KeyCode::Backspace => {let _ = command.pop();},
                         KeyCode::Enter => {mode = get_mode(&command);command = String::new()},
+                        KeyCode::Esc => command = String::new(),
                         _ => ()
                     }
                 },
