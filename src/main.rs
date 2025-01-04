@@ -16,7 +16,8 @@ enum Mode {
 struct App<'a>{
     mode: Mode,
     input: &'a String,
-    command: &'a String
+    command: &'a String,
+    line_name: &'a String
 }
 fn main() -> Result<(), io::Error> {
     // setup terminal
@@ -44,15 +45,17 @@ fn run(terminal:&mut Terminal<CrosstermBackend<io::Stdout>>) -> Result<(),Error>
     let mut mode = Mode::Mode;
     let mut command = String::new();
     let mut edit_cursor:usize = 0;
+    let mut line_name = String::from("Mode");
    loop {
-        terminal.draw(|f|render(f, App {mode: mode,input: &input,command: &command},&mut edit_cursor));
+        terminal.draw(|f|render(f, App {mode: mode,input: &input,command: &command,line_name: &line_name},&mut edit_cursor));
         if let Event::Key(key) = event::read().unwrap() {
             match mode {
                 Mode::Mode => {
+                    line_name = String::from("Mode");
                     match key.code {
                         KeyCode::Char(x) => command += &x.to_string(),
                         KeyCode::Backspace => {let _ = command.pop();},
-                        KeyCode::Enter => {mode = get_mode(&command);command = String::new()},
+                        KeyCode::Enter => {mode = get_mode(&command,&mut line_name);command = String::new()},
                         KeyCode::Esc => command = String::new(),
                         _ => ()
                     }
@@ -95,7 +98,7 @@ fn render(f:&mut  Frame<'_,CrosstermBackend<io::Stdout>>, app: App,edit_cursor:&
         offset = 0
     }
     let input = Paragraph::new(app.input.as_ref()).scroll((offset,0)).block(Block::default().borders(Borders::ALL));
-    let command = Paragraph::new(vec![Spans::from(Span::raw(app.command))]).style(Style::default()).block(Block::default().borders(Borders::ALL).title("Mode"));
+    let command = Paragraph::new(vec![Spans::from(Span::raw(app.command))]).style(Style::default()).block(Block::default().borders(Borders::ALL).title(app.line_name.as_str()));
     f.render_widget(input,chunks[0]);
     f.render_widget(command, chunks[1]);
     let mut x:u16 = 0;
@@ -113,12 +116,12 @@ fn render(f:&mut  Frame<'_,CrosstermBackend<io::Stdout>>, app: App,edit_cursor:&
     }
     f.set_cursor(chunks[0].x + x + 1, y + chunks[0].y + 1);
 }
-fn get_mode(command: &String) -> Mode {
+fn get_mode(command: &String,line_name: &mut String) -> Mode {
    //println!("{:?}",command);
     return match command.as_str() {
         "e" | "edit" => Mode::Edit,
         "q" | "quit" => Mode::Quit,
-        _ => Mode::Error
+        _ => {*line_name = String::from("Error");Mode::Error}
     };
 }
 fn lines<'a>(input:&'a String) -> Vec<&'a str> {
