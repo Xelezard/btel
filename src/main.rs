@@ -65,6 +65,7 @@ fn run(terminal:&mut Terminal<CrosstermBackend<io::Stdout>>) -> Result<(),Error>
                     KeyCode::Left => {if edit_cursor != 0 {edit_cursor -= 1}},
                     KeyCode::Right => edit_cursor +=1,
                     KeyCode::Up => edit_cursor = line_up(&mut input,&mut edit_cursor),
+                    KeyCode::Down => edit_cursor = line_down(&mut input,&mut edit_cursor),
                     //KeyCode::Up => edit_cursor,
                     _ => ()
                 },
@@ -126,6 +127,33 @@ fn lines<'a>(input:&'a String) -> Vec<&'a str> {
     lines
 }
 fn line_up(input:&String,cursor: &mut usize) -> usize {
+    if *(&(&input.chars().collect::<Vec<char>>())[..*cursor].contains(&'\n')) {
+        let target_string = &(String::from_utf8(input.as_bytes()[..*cursor].to_vec())).unwrap_or(format!("{}",input));
+        let mut lines = lines(target_string);
+        lines.pop();
+        lines.pop();
+        if let Some(last) = lines.last() {
+            if let Some(second_last) = lines.get(lines.len().wrapping_sub(2)) {
+                let mut  new_cursor:usize = 0;
+                for i in &lines[0..lines.len()-2] {
+                    for _ in 0..i.len() {
+                        new_cursor += 1;
+                    }
+                    new_cursor += 1;
+                }
+                if last.len() <= second_last.len() {
+                    new_cursor += last.len();
+                } else {
+                    new_cursor += second_last.len();
+                }
+                return new_cursor;
+            }
+        }
+
+    }
+    *cursor
+}
+fn line_down(input:&String,cursor: &mut usize) -> usize {
     if *(&(&input.chars().collect::<Vec<char>>())[..*cursor].contains(&'\n')) {
         let target_string = &(String::from_utf8(input.as_bytes()[..*cursor].to_vec())).unwrap_or(format!("{}",input));
         let mut lines = lines(target_string);
