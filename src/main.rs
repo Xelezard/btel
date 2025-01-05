@@ -1,4 +1,4 @@
-use std::{fmt::Error, io};
+use std::{fmt::Error, fs, io};
 use tui::{
     backend::CrosstermBackend, layout::{Constraint, Direction, Layout}, style::Style, text::{Span, Spans}, widgets::{Block, Borders, Paragraph, Widget}, Frame, Terminal
 };
@@ -10,14 +10,17 @@ enum Mode {
     Mode,
     Edit,
     Error,
-    Quit
+    Quit,
+    Open,
+    Save,
 }
 #[derive(Debug)]
 struct App<'a>{
     mode: Mode,
     input: &'a String,
     command: &'a String,
-    line_name: &'a String
+    line_name: &'a String,
+    file_name: &'a String,
 }
 fn main() -> Result<(), io::Error> {
     // setup terminal
@@ -46,8 +49,9 @@ fn run(terminal:&mut Terminal<CrosstermBackend<io::Stdout>>) -> Result<(),Error>
     let mut command = String::new();
     let mut edit_cursor:usize = 0;
     let mut line_name = String::from("Mode");
+    let mut file_name = String::from("New File");
    loop {
-        terminal.draw(|f|render(f, App {mode: mode,input: &input,command: &command,line_name: &line_name},&mut edit_cursor));
+        terminal.draw(|f|render(f, App {mode: mode,input: &input,command: &command,line_name: &line_name,file_name: &file_name},&mut edit_cursor));
         if let Event::Key(key) = event::read().unwrap() {
             match mode {
                 Mode::Mode => {
@@ -60,12 +64,32 @@ fn run(terminal:&mut Terminal<CrosstermBackend<io::Stdout>>) -> Result<(),Error>
                         _ => ()
                     }
                 },
+                Mode::Open => {
+                    line_name = String::from("Open");
+                    match key.code {
+                        KeyCode::Char(x) => command += &x.to_string(),
+                        KeyCode::Backspace => {let _ = command.pop();},
+                        KeyCode::Enter => {if let Ok(file) = open(&command){input = file;mode = Mode::Mode;line_name = String::from("Mode");file_name = String::from(command)}else {line_name = String::from("File not found")}command = String::new()},
+                        KeyCode::Esc => {command = String::new();mode = Mode::Mode;line_name = String::from("Mode")},
+                        _ => ()
+                    }
+                },
+                Mode::Save => {
+                    line_name = String::from("Open");
+                    match key.code {
+                        KeyCode::Char(x) => command += &x.to_string(),
+                        KeyCode::Backspace => {let _ = command.pop();},
+                        KeyCode::Enter => {save(&command,&mut file_name,&input);mode = Mode::Mode;line_name = String::from("Mode");file_name = String::from(command);command = String::new()},
+                        KeyCode::Esc => {command = String::new();mode = Mode::Mode;line_name = String::from("Mode")},
+                        _ => ()
+                    }
+                },
                 Mode::Edit => match key.code {
                     KeyCode::Char(x) => {if x.is_ascii() {input.insert(edit_cursor, x)/*input += &x.to_string()*/;edit_cursor += 1;}},
                     KeyCode::Backspace => {if edit_cursor != 0 {if edit_cursor == input.len() {let _ = input.pop();} else {let _ = input.remove(edit_cursor -1);edit_cursor -= 1;}}},
                     KeyCode::Delete => {if edit_cursor != input.len() {if edit_cursor + 1 == input.len() {let _ = input.pop();} else {let _ = input.remove(edit_cursor + 1);/*edit_cursor -= 1;*/}}},
                     KeyCode::Enter => {input.insert(edit_cursor, '\n')/*input += &"\n".to_string()*/;edit_cursor;edit_cursor += 1;},
-                    KeyCode::Esc => {mode = Mode::Mode},
+                    KeyCode::Esc => {mode = Mode::Mode;line_name = String::from("Mode")},
                     KeyCode::Left => {if edit_cursor != 0 {edit_cursor -= 1}},
                     KeyCode::Right => edit_cursor +=1,
                     KeyCode::Up => edit_cursor = line_up(&mut input,&mut edit_cursor),
@@ -73,7 +97,7 @@ fn run(terminal:&mut Terminal<CrosstermBackend<io::Stdout>>) -> Result<(),Error>
                     //KeyCode::Up => edit_cursor,
                     _ => ()
                 },
-                Mode::Error => {command = String::from("No mode found with this name");mode = Mode::Mode},
+                Mode::Error => {mode = Mode::Mode},
                 Mode::Quit => return Ok(())
             }
         }
@@ -97,7 +121,7 @@ fn render(f:&mut  Frame<'_,CrosstermBackend<io::Stdout>>, app: App,edit_cursor:&
     } else {
         offset = 0
     }
-    let input = Paragraph::new(app.input.as_ref()).scroll((offset,0)).block(Block::default().borders(Borders::ALL));
+    let input = Paragraph::new(app.input.as_ref()).scroll((offset,0)).block(Block::default().borders(Borders::ALL).title(app.file_name.as_str()));
     let command = Paragraph::new(vec![Spans::from(Span::raw(app.command))]).style(Style::default()).block(Block::default().borders(Borders::ALL).title(app.line_name.as_str()));
     f.render_widget(input,chunks[0]);
     f.render_widget(command, chunks[1]);
@@ -121,8 +145,21 @@ fn get_mode(command: &String,line_name: &mut String) -> Mode {
     return match command.as_str() {
         "e" | "edit" => Mode::Edit,
         "q" | "quit" => Mode::Quit,
-        _ => {*line_name = String::from("Error");Mode::Error}
+        "o" | "open" => {*line_name = String::from("Open");Mode::Open},
+        "s" | "save" => {*line_name = String::from("Save");Mode::Save},
+        _ => {*line_name = String::from("Error - Mode not found");Mode::Error}
     };
+}
+fn open(command: &String) -> Result<String,std::io::Error>{
+    fs::read_to_string(command)
+ }
+fn save(command: &String,file_name: &mut String,input:&String) {
+    if *file_name != String::from("New File") {
+        fs::write(file_name, input);
+    } else {
+        fs::write(command, input);
+        *file_name = command.clone();
+    }
 }
 fn lines<'a>(input:&'a String) -> Vec<&'a str> {
     let mut lines:Vec<&str> = input.split("\n").collect();
