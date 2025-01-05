@@ -217,11 +217,7 @@ fn line_down(input:&String,cursor: &usize) -> usize {
                     }
                     new_cursor += 1;
                 }
-                if last.len() > second_last.len() {
-                    new_cursor += last.len();
-                } else {
                     new_cursor += second_last.len();
-                }
                 return (input.len() - new_cursor) + current_line;
             }
         }
