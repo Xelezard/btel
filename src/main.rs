@@ -1,4 +1,4 @@
-use std::{fmt::Error, fs, io};
+use std::{fmt::Error, fs, io, process::Command};
 use tui::{
     backend::CrosstermBackend, layout::{Constraint, Direction, Layout}, style::Style, text::{Span, Spans}, widgets::{Block, Borders, Paragraph, Widget}, Frame, Terminal
 };
@@ -154,7 +154,7 @@ fn open(command: &String) -> Result<String,std::io::Error>{
     fs::read_to_string(command)
  }
 fn save(command: &String,file_name: &mut String,input:&String) {
-    if *file_name != String::from("New File") {
+    if command.len() == 0 && *file_name != String::from("New File"){
         fs::write(file_name, input);
     } else {
         fs::write(command, input);
