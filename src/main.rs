@@ -1,9 +1,9 @@
-use std::{fmt::Error, fs, io, process::Command};
+use std::{fmt::Error, fs, io};
 use tui::{
-    backend::CrosstermBackend, layout::{Constraint, Direction, Layout}, style::Style, text::{Span, Spans}, widgets::{Block, Borders, Paragraph, Widget}, Frame, Terminal
+    backend::CrosstermBackend, layout::{Constraint, Direction, Layout}, style::Style, text::{Span, Spans}, widgets::{Block, Borders, Paragraph}, Frame, Terminal
 };
 use crossterm::{
-    cursor, event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode}, execute, terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen}
+    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode}, execute, terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen}
 };
 #[derive(Clone, Copy,Debug)]
 enum Mode {
@@ -30,7 +30,7 @@ fn main() -> Result<(), io::Error> {
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    run(&mut terminal);
+    let _ = run(&mut terminal);
 
     // restore terminal
     disable_raw_mode()?;
@@ -51,7 +51,7 @@ fn run(terminal:&mut Terminal<CrosstermBackend<io::Stdout>>) -> Result<(),Error>
     let mut line_name = String::from("Mode");
     let mut file_name = String::from("New File");
    loop {
-        terminal.draw(|f|render(f, App {mode: mode,input: &input,command: &command,line_name: &line_name,file_name: &file_name},&mut edit_cursor));
+        let _ = terminal.draw(|f|render(f, App {mode: mode,input: &input,command: &command,line_name: &line_name,file_name: &file_name},&mut edit_cursor));
         if let Event::Key(key) = event::read().unwrap() {
             match mode {
                 Mode::Mode => {
@@ -88,7 +88,7 @@ fn run(terminal:&mut Terminal<CrosstermBackend<io::Stdout>>) -> Result<(),Error>
                     KeyCode::Char(x) => {if x.is_ascii() {input.insert(edit_cursor, x)/*input += &x.to_string()*/;edit_cursor += 1;}},
                     KeyCode::Backspace => {if edit_cursor != 0 {if edit_cursor == input.len() {let _ = input.pop();} else {let _ = input.remove(edit_cursor -1);edit_cursor -= 1;}}},
                     KeyCode::Delete => {if edit_cursor != input.len() {if edit_cursor + 1 == input.len() {let _ = input.pop();} else {let _ = input.remove(edit_cursor + 1);/*edit_cursor -= 1;*/}}},
-                    KeyCode::Enter => {input.insert(edit_cursor, '\n')/*input += &"\n".to_string()*/;edit_cursor;edit_cursor += 1;},
+                    KeyCode::Enter => {input.insert(edit_cursor, '\n')/*input += &"\n".to_string()*/;edit_cursor += 1;},
                     KeyCode::Esc => {mode = Mode::Mode;line_name = String::from("Mode")},
                     KeyCode::Left => {if edit_cursor != 0 {edit_cursor -= 1}},
                     KeyCode::Right => edit_cursor +=1,
@@ -155,9 +155,9 @@ fn open(command: &String) -> Result<String,std::io::Error>{
  }
 fn save(command: &String,file_name: &mut String,input:&String) {
     if command.len() == 0 && *file_name != String::from("New File"){
-        fs::write(file_name, input);
+        let _ = fs::write(file_name, input);
     } else {
-        fs::write(command, input);
+        let _ = fs::write(command, input);
         *file_name = command.clone();
     }
 }
@@ -208,8 +208,7 @@ fn line_down(input:&String,cursor: &usize) -> usize {
         let mut lines = lines(target_string);
         lines.pop();
         lines.pop();
-        if let Some(last) = lines.get(0) {
-            if let Some(second_last) = lines.get(1) {
+            if let Some(second) = lines.get(1) {
                 let mut  new_cursor:usize = 0;
                 for i in &lines[2..] {
                     for _ in 0..i.len() {
@@ -217,10 +216,9 @@ fn line_down(input:&String,cursor: &usize) -> usize {
                     }
                     new_cursor += 1;
                 }
-                    new_cursor += second_last.len();
+                    new_cursor += second.len();
                 return (input.len() - new_cursor) + current_line;
             }
-        }
 
     }
     *cursor
