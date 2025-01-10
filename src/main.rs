@@ -11,6 +11,7 @@ enum Mode {
     Edit,
     Error,
     Quit,
+    ForceQuit,
     Open,
     Save,
     Find,
@@ -54,6 +55,7 @@ fn run(terminal:&mut Terminal<CrosstermBackend<io::Stdout>>) -> Result<(),Error>
     let mut file_name = String::from("New File");
     let mut findings: Vec<usize> = Vec::new();
     let mut find_cursor: isize = -1;
+    let mut saved: bool = true;
    loop {
         let _ = terminal.draw(|f|render(f, App {mode: mode,input: &input,command: &command,line_name: &line_name,file_name: &file_name},&mut edit_cursor));
         if let Event::Key(key) = event::read().unwrap() {
@@ -61,7 +63,7 @@ fn run(terminal:&mut Terminal<CrosstermBackend<io::Stdout>>) -> Result<(),Error>
                 Mode::Mode => {
                     line_name = String::from("Mode");
                     match key.code {
-                        KeyCode::Char(x) => command += &x.to_string(),
+                        KeyCode::Char(x) => {command += &x.to_string();},
                         KeyCode::Backspace => {let _ = command.pop();},
                         KeyCode::Enter => {mode = get_mode(&command,&mut line_name);command = String::new()},
                         KeyCode::Esc => command = String::new(),
@@ -73,7 +75,7 @@ fn run(terminal:&mut Terminal<CrosstermBackend<io::Stdout>>) -> Result<(),Error>
                     match key.code {
                         KeyCode::Char(x) => command += &x.to_string(),
                         KeyCode::Backspace => {let _ = command.pop();},
-                        KeyCode::Enter => {if let Ok(file) = open(&command){input = file;mode = Mode::Mode;line_name = String::from("Mode");file_name = String::from(command)}else {line_name = String::from("File not found")}command = String::new()},
+                        KeyCode::Enter => {if let Ok(file) = open(&command){input = file;mode = Mode::Mode;line_name = String::from("Mode");file_name = String::from(command);saved = true}else {line_name = String::from("File not found")}command = String::new()},
                         KeyCode::Esc => {command = String::new();mode = Mode::Mode;line_name = String::from("Mode")},
                         _ => ()
                     }
@@ -83,7 +85,7 @@ fn run(terminal:&mut Terminal<CrosstermBackend<io::Stdout>>) -> Result<(),Error>
                     match key.code {
                         KeyCode::Char(x) => command += &x.to_string(),
                         KeyCode::Backspace => {let _ = command.pop();},
-                        KeyCode::Enter => {save(&command,&mut file_name,&input);mode = Mode::Mode;line_name = String::from("Mode");file_name = String::from(command);command = String::new()},
+                        KeyCode::Enter => {save(&command,&mut file_name,&input,&mut saved);mode = Mode::Mode;line_name = String::from("Mode");command = String::new()},
                         KeyCode::Esc => {command = String::new();mode = Mode::Mode;line_name = String::from("Mode")},
                         _ => ()
                     }
@@ -108,20 +110,20 @@ fn run(terminal:&mut Terminal<CrosstermBackend<io::Stdout>>) -> Result<(),Error>
                 }
                 }
                 Mode::Edit => match key.code {
-                    KeyCode::Char(x) => {if x.is_ascii() {input.insert(edit_cursor, x)/*input += &x.to_string()*/;edit_cursor += 1;}},
-                    KeyCode::Backspace => {if edit_cursor != 0 {if edit_cursor == input.len() {let _ = input.pop();} else {let _ = input.remove(edit_cursor -1);edit_cursor -= 1;}}},
-                    KeyCode::Delete => {if edit_cursor != input.len() {if edit_cursor + 1 == input.len() {let _ = input.pop();} else {let _ = input.remove(edit_cursor + 1);/*edit_cursor -= 1;*/}}},
+                    KeyCode::Char(x) => {if x.is_ascii() {input.insert(edit_cursor, x)/*input += &x.to_string()*/;edit_cursor += 1;saved = false}},
+                    KeyCode::Backspace => {if edit_cursor != 0 {if edit_cursor == input.len() {let _ = input.pop();} else {let _ = input.remove(edit_cursor -1);edit_cursor -= 1;saved = false}}},
+                    KeyCode::Delete => {if edit_cursor != input.len() {if edit_cursor + 1 == input.len() {let _ = input.pop();} else {let _ = input.remove(edit_cursor + 1);/*edit_cursor -= 1;*/}}saved = false},
                     KeyCode::Enter => {input.insert(edit_cursor, '\n')/*input += &"\n".to_string()*/;edit_cursor += 1;},
                     KeyCode::Esc => {mode = Mode::Mode;line_name = String::from("Mode")},
                     KeyCode::Left => {if edit_cursor != 0 {edit_cursor -= 1}},
                     KeyCode::Right => edit_cursor +=1,
                     KeyCode::Up => edit_cursor = line_up(&mut input,&mut edit_cursor),
                     KeyCode::Down => edit_cursor = line_down(&mut input,&mut edit_cursor),
-                    //KeyCode::Up => edit_cursor,
                     _ => ()
                 },
-                Mode::Error => {mode = Mode::Mode},
-                Mode::Quit => return Ok(())
+                Mode::Error => {mode = Mode::Mode;line_name = String::from("Mode")},
+                Mode::Quit => if saved {return Ok(())} else {mode = Mode::Error;line_name = String::from("Unsaved changes use fq to quit anyway")},
+                Mode::ForceQuit => return Ok(())
             }
         }
     }
@@ -175,18 +177,23 @@ fn get_mode(command: &String,line_name: &mut String) -> Mode {
         "o" | "open" => {*line_name = String::from("Open");Mode::Open},
         "s" | "save" => {*line_name = String::from("Save");Mode::Save},
         "f" | "find" => {*line_name = String::from("Find");Mode::Find},
+        "fq" | "force quit" => {*line_name = String::from("Force Quit");Mode::ForceQuit},
         _ => {*line_name = String::from("Error - Mode not found");Mode::Error}
     };
 }
 fn open(command: &String) -> Result<String,std::io::Error>{
     fs::read_to_string(command)
  }
-fn save(command: &String,file_name: &mut String,input:&String) {
+fn save(command: &String,file_name: &mut String,input:&String,saved:&mut bool) {
     if command.len() == 0 && *file_name != String::from("New File"){
-        let _ = fs::write(file_name, input);
+        if let Ok(_) = fs::write(file_name, input) {
+            *saved = true;
+        }
     } else {
-        let _ = fs::write(command, input);
-        *file_name = command.clone();
+        if let Ok(_) = fs::write(command, input) {
+            *saved = true;
+        }
+        *file_name = String::from(command);//command.clone();
     }
 }
 fn lines<'a>(input:&'a String) -> Vec<&'a str> {

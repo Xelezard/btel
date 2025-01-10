@@ -35,7 +35,14 @@ Press esc to go back to Mode mode.
 #### Quit mode
 This mode can be accesed by typing "q" or "quit" into the "mode" field in Mode mode.
 
-Press any key to exit Btel.
+Press any key to exit Btel if all changes are saved.
+
+Press esc to go back to Mode mode.
+
+#### Force Quit mode
+This mode can be accesed by typing "fq" or "force quit" into the "mode" field in Mode mode.
+
+Press any key to exit Btel and not save anything.
 
 Press esc to go back to Mode mode.
 
