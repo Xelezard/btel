@@ -139,23 +139,29 @@ fn render(f:&mut  Frame<'_,CrosstermBackend<io::Stdout>>, app: App,edit_cursor:&
     .split(f.size());
     let mut x:u16 = 0;
     let mut y:u16 = 0;
-    let mut offset:u16 = 0;
+    let mut offsety:u16 = 0;
+    let mut offsetx:u16 =0;
     for i in 0..*edit_cursor {
         if i< app.input.len(){ 
-        x += 1;
+            if x +3 < chunks[0].width{
+                x += 1;
+            } else {
+                offsetx += 1;
+            }
         if &app.input.chars().collect::<Vec<char>>()[i] == &'\n' {
             x = 0;
+            offsetx = 0;
             if y +3 < chunks[0].height{
                 y += 1;
             } else {
-                offset += 1;
+                offsety += 1;
             }
         }  
     } else {
         *edit_cursor -= 1;
     }
     }
-    let input = Paragraph::new(app.input.as_ref()).scroll((offset,0)).block(Block::default().borders(Borders::ALL).title(app.file_name.as_str()));
+    let input = Paragraph::new(app.input.as_ref()).scroll((offsety,offsetx)).block(Block::default().borders(Borders::ALL).title(app.file_name.as_str()));
     let command = Paragraph::new(vec![Spans::from(Span::raw(app.command))]).style(Style::default()).block(Block::default().borders(Borders::ALL).title(app.line_name.as_str()));
     f.render_widget(input,chunks[0]);
     f.render_widget(command, chunks[1]);

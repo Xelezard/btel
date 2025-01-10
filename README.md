@@ -1,7 +1,12 @@
 # Btel Text Editor 
 > **B**ad **T**ext **E**ditor **L**ol
 
-A simple text editor written in rust
+A simple text editor hobby project written in rust
+
+## Features
+- Opening and Saving files
+- Scrolling
+- Searching for text
 
 ## Install
 To install run:
