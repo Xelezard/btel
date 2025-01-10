@@ -79,7 +79,7 @@ fn run(terminal:&mut Terminal<CrosstermBackend<io::Stdout>>) -> Result<(),Error>
                     }
                 },
                 Mode::Save => {
-                    line_name = String::from("Open");
+                    line_name = String::from("Save");
                     match key.code {
                         KeyCode::Char(x) => command += &x.to_string(),
                         KeyCode::Backspace => {let _ = command.pop();},
