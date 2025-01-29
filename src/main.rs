@@ -14,13 +14,12 @@ enum Mode {
     ForceQuit,
     Open,
     Save,
-    Find,
-    FindFurther,
+    Find(usize,usize),
 }
 #[derive(Debug)]
 struct App<'a>{
     mode: Mode,
-    input: &'a String,
+    input: &'a Vec<String>,
     command: &'a String,
     line_name: &'a String,
     file_name: &'a String,
@@ -47,17 +46,17 @@ fn main() -> Result<(), io::Error> {
     Ok(())
 }
 fn run(terminal:&mut Terminal<CrosstermBackend<io::Stdout>>) -> Result<(),Error>{
-    let mut input = String::new();
+    let mut input: Vec<String> = vec![String::new()];
+    let mut vert_cursor:usize = 0;
     let mut mode = Mode::Mode;
     let mut command = String::new();
     let mut edit_cursor:usize = 0;
     let mut line_name = String::from("Mode");
     let mut file_name = String::from("New File");
-    let mut findings: Vec<usize> = Vec::new();
-    let mut find_cursor: isize = -1;
     let mut saved: bool = true;
-   loop {
-        let _ = terminal.draw(|f|render(f, App {mode: mode,input: &input,command: &command,line_name: &line_name,file_name: &file_name},&mut edit_cursor));
+    let mut scroll:usize = 0;
+    loop {
+        let _ = terminal.draw(|f|render(f, App {mode: mode,input: &input,command: &command,line_name: &line_name,file_name: &file_name},&mut edit_cursor,&mut vert_cursor,&mut scroll));
         if let Event::Key(key) = event::read().unwrap() {
             match mode {
                 Mode::Mode => {
@@ -75,7 +74,7 @@ fn run(terminal:&mut Terminal<CrosstermBackend<io::Stdout>>) -> Result<(),Error>
                     match key.code {
                         KeyCode::Char(x) => command += &x.to_string(),
                         KeyCode::Backspace => {let _ = command.pop();},
-                        KeyCode::Enter => {if let Ok(file) = open(&command){input = file;mode = Mode::Mode;line_name = String::from("Mode");file_name = String::from(command);saved = true}else {line_name = String::from("File not found")}command = String::new()},
+                        KeyCode::Enter => {if let Some(file) = open(&command){input = file;mode = Mode::Mode;line_name = String::from("Mode");file_name = String::from(command);saved = true}else {line_name = String::from("File not found")}command = String::new()},
                         KeyCode::Esc => {command = String::new();mode = Mode::Mode;line_name = String::from("Mode")},
                         _ => ()
                     }
@@ -90,45 +89,36 @@ fn run(terminal:&mut Terminal<CrosstermBackend<io::Stdout>>) -> Result<(),Error>
                         _ => ()
                     }
                 },
-                Mode::Find => {
+                Mode::Find(x,y) => {
                     line_name = String::from("Find");
                     match key.code {
-                        KeyCode::Char(x) => command += &x.to_string(),
-                        KeyCode::Backspace => {let _ = command.pop();},
-                        KeyCode::Enter => {findings = find(&command, &input);mode = Mode::FindFurther}
+                        KeyCode::Char(x) => {command += &x.to_string();mode = Mode::Find(0, 0)},
+                        KeyCode::Backspace => {let _ = command.pop();mode = Mode::Find(0, 0)},
+                        KeyCode::Enter => {if let Some((x_cursor,y_cursor)) = find(&command, &input,x,y){vert_cursor = y_cursor;edit_cursor = x_cursor;mode = Mode::Find(x_cursor +1, y_cursor)} else if x == 0 && y == 0{line_name = String::from("Pattern not found")}else {mode = Mode::Find(0, 0)}}
                         KeyCode::Esc => {command = String::new();mode = Mode::Mode;line_name = String::from("Mode")},
                         _ => ()
                     }
                 },
-                Mode::FindFurther => {
-                    if find_cursor >= -1 {
-                        match key.code {
-                        KeyCode::Enter => {if find_cursor +1 < (findings.len()as isize) {find_cursor += 1;edit_cursor = findings[find_cursor as usize]} else {find_cursor = -1}},
-                        KeyCode::Esc => {find_cursor = 0; findings = Vec::new();mode = Mode::Find; line_name = String::from("Find")}
-                        _ => ()
-                    }
-                }
-                }
                 Mode::Edit => match key.code {
-                    KeyCode::Char(x) => {if x.is_ascii() {input.insert(edit_cursor, x)/*input += &x.to_string()*/;edit_cursor += 1;saved = false}},
-                    KeyCode::Backspace => {if edit_cursor != 0 {if edit_cursor == input.len() {let _ = input.pop();} else {let _ = input.remove(edit_cursor -1);edit_cursor -= 1;saved = false}}},
-                    KeyCode::Delete => {if edit_cursor != input.len() {if edit_cursor + 1 == input.len() {let _ = input.pop();} else {let _ = input.remove(edit_cursor + 1);/*edit_cursor -= 1;*/}}saved = false},
-                    KeyCode::Enter => {input.insert(edit_cursor, '\n')/*input += &"\n".to_string()*/;edit_cursor += 1;},
+                    KeyCode::Char(x) => {if x.is_ascii() {input[vert_cursor].insert(edit_cursor, x)/*input += &x.to_string()*/;edit_cursor += 1;saved = false}},
+                    KeyCode::Backspace => {if edit_cursor != 0 {if edit_cursor +1== input[vert_cursor].len() {let _ = input[vert_cursor].pop();} else {let _ = input[vert_cursor].remove(edit_cursor -1);edit_cursor -= 1;saved = false}}else if vert_cursor != 0{let rest = input.remove(vert_cursor);input[vert_cursor-1] += &rest;vert_cursor -= 1;edit_cursor = input[vert_cursor].len() - rest.len()} },
+                    KeyCode::Delete => {if edit_cursor != input[vert_cursor].len() {if edit_cursor + 1 == input[vert_cursor].len() {let _ = input[vert_cursor].pop();}else {let _ = input[vert_cursor].remove(edit_cursor + 1);/*edit_cursor -= 1;*/}}else if vert_cursor +1 != input.len(){let rest = input.remove(vert_cursor +1); input[vert_cursor] += &rest}saved = false},
+                    KeyCode::Enter => {let line = input[vert_cursor].split_off(edit_cursor);input.insert(vert_cursor+1,line)/*input += &"\n".to_string()*/;vert_cursor += 1; if input[vert_cursor].len() < edit_cursor +2 {edit_cursor = input[vert_cursor].len()}},
                     KeyCode::Esc => {mode = Mode::Mode;line_name = String::from("Mode")},
-                    KeyCode::Left => {if edit_cursor != 0 {edit_cursor -= 1}},
-                    KeyCode::Right => edit_cursor +=1,
-                    KeyCode::Up => edit_cursor = line_up(&mut input,&mut edit_cursor),
-                    KeyCode::Down => edit_cursor = line_down(&mut input,&mut edit_cursor),
+                    KeyCode::Left => {if edit_cursor != 0 {edit_cursor -= 1} else if vert_cursor != 0 {vert_cursor -=1;edit_cursor = input[vert_cursor].len()}},
+                    KeyCode::Right => if edit_cursor +1 <= input[vert_cursor].len() {edit_cursor  +=1}else if vert_cursor +1 != input.len(){vert_cursor +=1;edit_cursor = 0},
+                    KeyCode::Up => if vert_cursor != 0 {vert_cursor -= 1; if input[vert_cursor].len() < edit_cursor +2 {edit_cursor = input[vert_cursor].len()}},
+                    KeyCode::Down => if vert_cursor +2 <= input.len() {vert_cursor += 1; if input[vert_cursor].len() < edit_cursor +2 {edit_cursor = input[vert_cursor].len()}},
                     _ => ()
                 },
                 Mode::Error => {mode = Mode::Mode;line_name = String::from("Mode")},
                 Mode::Quit => if saved {return Ok(())} else {mode = Mode::Error;line_name = String::from("Unsaved changes use fq to quit anyway")},
-                Mode::ForceQuit => return Ok(())
+                Mode::ForceQuit => return Ok(()),
             }
         }
     }
 }
-fn render(f:&mut  Frame<'_,CrosstermBackend<io::Stdout>>, app: App,edit_cursor:&mut usize) {
+fn render(f:&mut  Frame<'_,CrosstermBackend<io::Stdout>>, app: App,edit_cursor:&mut usize,vert_cursor:&mut usize,scroll: &mut usize) {
     let chunks = Layout::default()
     .direction(Direction::Vertical)
     .margin(1)
@@ -139,35 +129,28 @@ fn render(f:&mut  Frame<'_,CrosstermBackend<io::Stdout>>, app: App,edit_cursor:&
     }
     )
     .split(f.size());
-    let mut x:u16 = 0;
-    let mut y:u16 = 0;
-    let mut offsety:u16 = 0;
-    let mut offsetx:u16 =0;
-    for i in 0..*edit_cursor {
-        if i< app.input.len(){ 
-            if x +3 < chunks[0].width{
-                x += 1;
-            } else {
-                offsetx += 1;
-            }
-        if &app.input.chars().collect::<Vec<char>>()[i] == &'\n' {
-            x = 0;
-            offsetx = 0;
-            if y +3 < chunks[0].height{
-                y += 1;
-            } else {
-                offsety += 1;
-            }
-        }  
+    if *vert_cursor  > (*scroll + (chunks[0].height as usize) -3) {
+        *scroll += 1
+    }else if *vert_cursor < *scroll  {
+        *scroll -= 1
+    }
+    let mut text = String::new();
+    if app.input.len() <= (*scroll + (chunks[0].height as usize)+2) {
+        for line in &app.input[*scroll..] {
+            text += line;
+            text += "\n"
+        }
     } else {
-        *edit_cursor -= 1;
+        for line in &app.input[*scroll..(*scroll + (chunks[0].height as usize) -1)] {
+            text += line;
+            text += "\n"
+        }
     }
-    }
-    let input = Paragraph::new(app.input.as_ref()).scroll((offsety,offsetx)).block(Block::default().borders(Borders::ALL).title(app.file_name.as_str()));
+    let input = Paragraph::new(text.as_ref()).block(Block::default().borders(Borders::ALL).title(app.file_name.as_str()));
     let command = Paragraph::new(vec![Spans::from(Span::raw(app.command))]).style(Style::default()).block(Block::default().borders(Borders::ALL).title(app.line_name.as_str()));
     f.render_widget(input,chunks[0]);
     f.render_widget(command, chunks[1]);
-    f.set_cursor(chunks[0].x + x + 1, y + chunks[0].y + 1);
+    f.set_cursor(chunks[0].x + (*edit_cursor as u16) + 1, (*vert_cursor as u16) + chunks[0].y + 1 - (*scroll as u16));
 }
 fn get_mode(command: &String,line_name: &mut String) -> Mode {
    //println!("{:?}",command);
@@ -176,98 +159,50 @@ fn get_mode(command: &String,line_name: &mut String) -> Mode {
         "q" | "quit" => Mode::Quit,
         "o" | "open" => {*line_name = String::from("Open");Mode::Open},
         "s" | "save" => {*line_name = String::from("Save");Mode::Save},
-        "f" | "find" => {*line_name = String::from("Find");Mode::Find},
+        "f" | "find" => {*line_name = String::from("Find");Mode::Find(0,0)},
         "fq" | "force quit" => {*line_name = String::from("Force Quit");Mode::ForceQuit},
         _ => {*line_name = String::from("Error - Mode not found");Mode::Error}
     };
 }
-fn open(command: &String) -> Result<String,std::io::Error>{
-    fs::read_to_string(command)
+fn open(command: &String) -> Option<Vec<String>>{
+    let file_option =fs::read_to_string(command);
+    if let Ok(file) = file_option {
+        let split:Vec<&str> = file.split("\n").collect();
+        let s: Vec<String> = split.iter().map(|f|f.to_string()).collect();
+        return Some(s);
+    }
+    None
  }
-fn save(command: &String,file_name: &mut String,input:&String,saved:&mut bool) {
+fn save(command: &String,file_name: &mut String,input:&Vec<String>,saved:&mut bool) {
+    let mut text =String::new();
+    for line in input {
+        text += line;
+        text += "\n"
+    }
     if command.len() == 0 && *file_name != String::from("New File"){
-        if let Ok(_) = fs::write(file_name, input) {
+        if let Ok(_) = fs::write(file_name, text) {
             *saved = true;
         }
     } else {
-        if let Ok(_) = fs::write(command, input) {
+        if let Ok(_) = fs::write(command, text) {
             *saved = true;
         }
         *file_name = String::from(command);//command.clone();
     }
 }
-fn lines<'a>(input:&'a String) -> Vec<&'a str> {
-    let mut lines:Vec<&str> = input.split("\n").collect();
-    lines.push("");
-    lines.push("");
-    lines
-}
-fn line_up(input:&String,cursor: &mut usize) -> usize {
-    if *(&(&input.chars().collect::<Vec<char>>())[..*cursor].contains(&'\n')) {
-        let target_string = &(String::from_utf8(input.as_bytes()[..*cursor].to_vec())).unwrap_or(format!("{}",input));
-        let mut lines = lines(target_string);
-        lines.pop();
-        lines.pop();
-        if let Some(last) = lines.last() {
-            if let Some(second_last) = lines.get(lines.len().wrapping_sub(2)) {
-                let mut  new_cursor:usize = 0;
-                for i in &lines[0..lines.len()-2] {
-                    for _ in 0..i.len() {
-                        new_cursor += 1;
-                    }
-                    new_cursor += 1;
-                }
-                if last.len() <= second_last.len() {
-                    new_cursor += last.len();
-                } else {
-                    new_cursor += second_last.len();
-                }
-                return new_cursor;
-            }
+fn find(command: &String,input:&Vec<String>,x:usize,y:usize) ->Option<(usize,usize)> {
+    let mut x_used = false;
+    for (i,line) in (&input[y..]).iter().enumerate() {
+        if !x_used {
+        if let Some(finding) = &line[x..].find(command) {
+            return Some((*finding+x,i +y));
         }
-
-    }
-    *cursor
-}
-fn line_down(input:&String,cursor: &usize) -> usize {
-    if *(&(&input.chars().collect::<Vec<char>>())[*cursor..].contains(&'\n')) {
-        let mut current_line:usize = 0;
-        for i in (0..*cursor).rev() {
-            if input.chars().collect::<Vec<char>>()[i] != '\n'  {
-                current_line += 1
-            }else {
-                break;
-            }
+        }else {
+        if let Some(finding) = line.find(command) {
+            return Some((finding,i+y));
         }
-        let target_string = &(String::from_utf8(input.as_bytes()[*cursor..].to_vec())).unwrap_or(format!("{}",input));
-        let mut lines = lines(target_string);
-        lines.pop();
-        lines.pop();
-            if let Some(second) = lines.get(1) {
-                let mut  new_cursor:usize = 0;
-                for i in &lines[2..] {
-                    for _ in 0..i.len() {
-                        new_cursor += 1;
-                    }
-                    new_cursor += 1;
-                }
-                    new_cursor += second.len();
-                return (input.len() - new_cursor) + current_line;
-            }
-
+        }   
+        x_used = true;
     }
-    *cursor
-}
-fn find(command: &String,input:&String) ->Vec<usize> {
-    let mut pos = 0;
-    let mut findings: Vec<usize> = Vec::new();
-    loop {
-        if let Some(finding) = input[pos..].find(command).map(|i| i+pos) {
-            findings.push(finding);
-            pos = finding + command.len()
-        } else {
-            break;
-        }
-    }
-    findings
+    None
 }
