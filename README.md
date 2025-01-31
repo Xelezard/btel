@@ -69,6 +69,13 @@ Enter your pattern and hit enter to move the cursor to the first finding.
 
 Press esc to go back to Mode mode.
 
+#### Command mode
+This mode can be accesed by typing "f" or "find" into the "mode" field in Mode mode.
+
+Enter a command to run it with the bash shell temporarily replacing the text field
+
+Press esc to go back to Mode mode.
+
 #### Error mode
 This mode will load when an error occurs and it will display an error message on the lower text field.
 

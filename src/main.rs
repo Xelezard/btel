@@ -1,11 +1,11 @@
-use std::{fmt::Error, fs, io};
+use std::{fmt::Error, fs, io, process::Command};
 use tui::{
     backend::CrosstermBackend, layout::{Constraint, Direction, Layout}, style::Style, text::{Span, Spans}, widgets::{Block, Borders, Paragraph}, Frame, Terminal
 };
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode}, execute, terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen}
 };
-#[derive(Clone, Copy,Debug)]
+#[derive(Clone, Copy,Debug,PartialEq)]
 enum Mode {
     Mode,
     Edit,
@@ -15,11 +15,13 @@ enum Mode {
     Open,
     Save,
     Find(usize,usize),
+    Command
 }
 #[derive(Debug)]
 struct App<'a>{
     mode: Mode,
     input: &'a Vec<String>,
+    output: &'a String,
     command: &'a String,
     line_name: &'a String,
     file_name: &'a String,
@@ -47,6 +49,7 @@ fn main() -> Result<(), io::Error> {
 }
 fn run(terminal:&mut Terminal<CrosstermBackend<io::Stdout>>) -> Result<(),Error>{
     let mut input: Vec<String> = vec![String::new()];
+    let mut output: String = String::new();
     let mut vert_cursor:usize = 0;
     let mut mode = Mode::Mode;
     let mut command = String::new();
@@ -56,7 +59,7 @@ fn run(terminal:&mut Terminal<CrosstermBackend<io::Stdout>>) -> Result<(),Error>
     let mut saved: bool = true;
     let mut scroll:usize = 0;
     loop {
-        let _ = terminal.draw(|f|render(f, App {mode: mode,input: &input,command: &command,line_name: &line_name,file_name: &file_name},&mut edit_cursor,&mut vert_cursor,&mut scroll));
+        let _ = terminal.draw(|f|render(f, App {mode: mode,input: &input,command: &command,line_name: &line_name,file_name: &file_name,output: &output},&mut edit_cursor,&mut vert_cursor,&mut scroll));
         if let Event::Key(key) = event::read().unwrap() {
             match mode {
                 Mode::Mode => {
@@ -66,6 +69,16 @@ fn run(terminal:&mut Terminal<CrosstermBackend<io::Stdout>>) -> Result<(),Error>
                         KeyCode::Backspace => {let _ = command.pop();},
                         KeyCode::Enter => {mode = get_mode(&command,&mut line_name);command = String::new()},
                         KeyCode::Esc => command = String::new(),
+                        _ => ()
+                    }
+                },
+                Mode::Command => {
+                    line_name = String::from("Command");
+                    match key.code {
+                        KeyCode::Char(x) => {command += &x.to_string();},
+                        KeyCode::Backspace => {let _ = command.pop();},
+                        KeyCode::Enter => {exc_command(&command,&mut output);command = String::new();},
+                        KeyCode::Esc => {command = String::new();mode = Mode::Mode;line_name = String::from("Mode");},
                         _ => ()
                     }
                 },
@@ -146,11 +159,17 @@ fn render(f:&mut  Frame<'_,CrosstermBackend<io::Stdout>>, app: App,edit_cursor:&
             text += "\n"
         }
     }
+    let output = Paragraph::new(app.output.to_string()).block(Block::default().borders(Borders::ALL).title(app.file_name.as_str()));
     let input = Paragraph::new(text.as_ref()).block(Block::default().borders(Borders::ALL).title(app.file_name.as_str()));
     let command = Paragraph::new(vec![Spans::from(Span::raw(app.command))]).style(Style::default()).block(Block::default().borders(Borders::ALL).title(app.line_name.as_str()));
-    f.render_widget(input,chunks[0]);
+    if app.mode == Mode::Command {
+        f.render_widget(output,chunks[0]);    
+        f.set_cursor(chunks[0].x + 1, chunks[0].y + 1);
+    } else {
+        f.render_widget(input,chunks[0]);   
+        f.set_cursor(chunks[0].x + (*edit_cursor as u16) + 1, (*vert_cursor as u16) + chunks[0].y + 1 - (*scroll as u16));
+    }
     f.render_widget(command, chunks[1]);
-    f.set_cursor(chunks[0].x + (*edit_cursor as u16) + 1, (*vert_cursor as u16) + chunks[0].y + 1 - (*scroll as u16));
 }
 fn get_mode(command: &String,line_name: &mut String) -> Mode {
    //println!("{:?}",command);
@@ -159,6 +178,7 @@ fn get_mode(command: &String,line_name: &mut String) -> Mode {
         "q" | "quit" => Mode::Quit,
         "o" | "open" => {*line_name = String::from("Open");Mode::Open},
         "s" | "save" => {*line_name = String::from("Save");Mode::Save},
+        "c" | "command" => {*line_name = String::from("Command");Mode::Command},
         "f" | "find" => {*line_name = String::from("Find");Mode::Find(0,0)},
         "fq" | "force quit" => {*line_name = String::from("Force Quit");Mode::ForceQuit},
         _ => {*line_name = String::from("Error - Mode not found");Mode::Error}
@@ -205,4 +225,13 @@ fn find(command: &String,input:&Vec<String>,x:usize,y:usize) ->Option<(usize,usi
         x_used = true;
     }
     None
+}
+fn exc_command(command: &String,input:&mut String) {
+    let mut exc_command = Command::new("bash");
+    exc_command.arg("-c").arg(command);
+    if let Ok(output) = exc_command.output(){
+        if let Ok(stdout) = String::from_utf8(output.stdout){
+        *input = stdout;
+        }
+}
 }
