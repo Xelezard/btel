@@ -239,10 +239,10 @@ fn exc_command(command: &String,output:&mut String) {
     let mut result = String::new();
     if let Ok(output) = exc_command.output(){
         if let Ok(stdout) = String::from_utf8(output.stdout){
-            result = stdout;
+            result += &stdout;
         }
         if let Ok(stdout) = String::from_utf8(output.stderr){
-            result = stdout;
+            result += &stdout;
         }
     }
     *output = result
