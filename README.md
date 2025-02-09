@@ -16,65 +16,41 @@ cargo install --git https://github.com/xelezard/btel.git
 ## Usage
 When opening Btel you see two fields the "New File" and the "Mode" block.
 Currently, you are in "Mode" mode.
-This mode is used to switch modes.
+Type a mode abreviation into the mode field to enter that mode.
+To go back to "Mode" mode use the esc key except the mode that your currently in states otherwise
 
 ### Modes
+> Mode Name -- Mode abreviation
+> 
+> Mode usage
 
 #### Mode mode
-Enter a mode name and press enter to switch to that mode.
+Enter a mode abreviation and press enter to switch to that mode.
 
 Press escape to clear the input field.
 
-#### Edit mode
-This mode can be accesed by typing "e" or "edit" into the "mode" field in Mode mode.
-
+#### Edit mode -- 'e' or 'edit' 
 In this mode you can write to the file.
 
-Press esc to go back to Mode mode.
-
-#### Quit mode
-This mode can be accesed by typing "q" or "quit" into the "mode" field in Mode mode.
-
+#### Quit mode -- 'q' or 'quit'
 Press any key to exit Btel if all changes are saved.
 
-Press esc to go back to Mode mode.
-
-#### Force Quit mode
-This mode can be accesed by typing "fq" or "force quit" into the "mode" field in Mode mode.
-
+#### Force Quit mode -- 'fq' or 'force quit'
 Press any key to exit Btel and not save anything.
 
-Press esc to go back to Mode mode.
-
-#### Open mode
-This mode can be accesed by typing "o" or "open" into the "mode" field in Mode mode.
-
+#### Open mode -- 'o' or 'open'
 Enter your file path inside of the "Open" field to open that file.
 
-Press esc to go back to Mode mode.
-
-#### Save mode
-This mode can be accesed by typing "s" or "save" into the "mode" field in Mode mode.
-
+#### Save mode -- 's' or 'save'
 To save type your desired file path into the "Save" field.
 
 If your upper field doesn't read "New File" anymore and you enter no file path it will save to the previously entered file path.
 
-Press esc to go back to Mode mode.
+#### Find mode -- 'f' or 'find'
+Enter your pattern and hit enter to move the cursor to the next finding.
 
-#### Find mode
-This mode can be accesed by typing "f" or "find" into the "mode" field in Mode mode.
-
-Enter your pattern and hit enter to move the cursor to the first finding.
-
-Press esc to go back to Mode mode.
-
-#### Command mode
-This mode can be accesed by typing "f" or "find" into the "mode" field in Mode mode.
-
+#### Command mode -- 'c' or 'command'
 Enter a command to run it with the bash shell temporarily replacing the text field
-
-Press esc to go back to Mode mode.
 
 #### Error mode
 This mode will load when an error occurs and it will display an error message on the lower text field.

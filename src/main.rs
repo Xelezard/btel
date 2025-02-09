@@ -226,12 +226,17 @@ fn find(command: &String,input:&Vec<String>,x:usize,y:usize) ->Option<(usize,usi
     }
     None
 }
-fn exc_command(command: &String,input:&mut String) {
+fn exc_command(command: &String,output:&mut String) {
     let mut exc_command = Command::new("bash");
     exc_command.arg("-c").arg(command);
+    let mut result = String::new();
     if let Ok(output) = exc_command.output(){
         if let Ok(stdout) = String::from_utf8(output.stdout){
-        *input = stdout;
+            result = stdout;
         }
-}
+        if let Ok(stdout) = String::from_utf8(output.stderr){
+            result = stdout;
+        }
+    }
+    *output = result
 }
