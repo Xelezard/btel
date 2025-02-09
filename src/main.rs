@@ -57,9 +57,10 @@ fn run(terminal:&mut Terminal<CrosstermBackend<io::Stdout>>) -> Result<(),Error>
     let mut line_name = String::from("Mode");
     let mut file_name = String::from("New File");
     let mut saved: bool = true;
-    let mut scroll:usize = 0;
+    let mut scroll_y:usize = 0;
+    let mut scroll_x:usize = 0;
     loop {
-        let _ = terminal.draw(|f|render(f, App {mode: mode,input: &input,command: &command,line_name: &line_name,file_name: &file_name,output: &output},&mut edit_cursor,&mut vert_cursor,&mut scroll));
+        let _ = terminal.draw(|f|render(f, App {mode: mode,input: &input,command: &command,line_name: &line_name,file_name: &file_name,output: &output},&mut edit_cursor,&mut vert_cursor,&mut scroll_y,&mut scroll_x));
         if let Event::Key(key) = event::read().unwrap() {
             match mode {
                 Mode::Mode => {
@@ -131,7 +132,7 @@ fn run(terminal:&mut Terminal<CrosstermBackend<io::Stdout>>) -> Result<(),Error>
         }
     }
 }
-fn render(f:&mut  Frame<'_,CrosstermBackend<io::Stdout>>, app: App,edit_cursor:&mut usize,vert_cursor:&mut usize,scroll: &mut usize) {
+fn render(f:&mut  Frame<'_,CrosstermBackend<io::Stdout>>, app: App,edit_cursor:&mut usize,vert_cursor:&mut usize,scroll: &mut usize,scroll_x: &mut usize) {
     let chunks = Layout::default()
     .direction(Direction::Vertical)
     .margin(1)
@@ -147,15 +148,21 @@ fn render(f:&mut  Frame<'_,CrosstermBackend<io::Stdout>>, app: App,edit_cursor:&
     }else if *vert_cursor < *scroll  {
         *scroll -= 1
     }
+    while *edit_cursor  > (*scroll_x + (chunks[0].width as usize) -3) {
+        *scroll_x += 1
+    }
+    while *edit_cursor < *scroll_x  {
+        *scroll_x -= 1
+    }
     let mut text = String::new();
     if app.input.len() <= (*scroll + (chunks[0].height as usize)+2) {
         for line in &app.input[*scroll..] {
-            text += line;
+            text += &line[*scroll_x..];
             text += "\n"
         }
     } else {
         for line in &app.input[*scroll..(*scroll + (chunks[0].height as usize) -1)] {
-            text += line;
+            text += &line[*scroll_x..];
             text += "\n"
         }
     }
@@ -167,7 +174,7 @@ fn render(f:&mut  Frame<'_,CrosstermBackend<io::Stdout>>, app: App,edit_cursor:&
         f.set_cursor(chunks[0].x + 1, chunks[0].y + 1);
     } else {
         f.render_widget(input,chunks[0]);   
-        f.set_cursor(chunks[0].x + (*edit_cursor as u16) + 1, (*vert_cursor as u16) + chunks[0].y + 1 - (*scroll as u16));
+        f.set_cursor(chunks[0].x + (*edit_cursor as u16) + 1 - (*scroll_x as u16), (*vert_cursor as u16) + chunks[0].y + 1 - (*scroll as u16));
     }
     f.render_widget(command, chunks[1]);
 }
