@@ -14,6 +14,12 @@ enum Mode {
     Command
 }
 #[derive(Clone, Copy,Debug,PartialEq)]
+enum Display {
+    Input,
+    Output,
+    Help
+}
+#[derive(Clone, Copy,Debug,PartialEq)]
 enum BtelCommand {
     Edit,
     Error,
@@ -22,7 +28,8 @@ enum BtelCommand {
     Find,
     Command,
     Open,
-    Save
+    Save,
+    Help
 }
 #[derive(Debug)]
 struct App<'a>{
@@ -32,8 +39,9 @@ struct App<'a>{
     command: &'a String,
     line_name: &'a String,
     file_name: &'a String,
-    display_output: &'a bool,
+    display: &'a Display,
 }
+const HELP_MESSAGE: &str = "Welcome to Btel!\n\nMost needed commands:\n\"e\" - switch to edit mode,\n\"q\" - quit if everything is saved\n\nfor more information please read the \"Usage\" part in the README.md\nhttps://github.com/Xelezard/btel";
 fn main() -> Result<(), io::Error> {
     // setup terminal
     enable_raw_mode()?;
@@ -67,18 +75,18 @@ fn run(terminal:&mut Terminal<CrosstermBackend<io::Stdout>>) -> Result<(),Error>
     let mut saved: bool = true;
     let mut scroll_y:usize = 0;
     let mut scroll_x:usize = 0;
-    let mut display_output = false;
+    let mut display = Display::Help;
     loop {
-        let _ = terminal.draw(|f|render(f, App {mode: mode,input: &input,command: &command,line_name: &line_name,file_name: &file_name,output: &output,display_output: &display_output},&mut edit_cursor,&mut vert_cursor,&mut scroll_y,&mut scroll_x));
+        let _ = terminal.draw(|f|render(f, App {mode: mode,input: &input,command: &command,line_name: &line_name,file_name: &file_name,output: &output,display: &display},&mut edit_cursor,&mut vert_cursor,&mut scroll_y,&mut scroll_x));
         if let Event::Key(key) = event::read().unwrap() {
             match mode {
                 Mode::Command => {
                     line_name = String::from("Command");
-                    display_output = false;
+                    display = Display::Input;
                     match key.code {
                         KeyCode::Char(x) => {command += &x.to_string();},
                         KeyCode::Backspace => {let _ = command.pop();},
-                        KeyCode::Enter => {exc_command(&mut command,&mut output,&mut mode,&mut display_output,&mut input,&mut saved,&mut file_name,&mut line_name);command = String::new();},
+                        KeyCode::Enter => {exc_command(&mut command,&mut output,&mut mode,&mut display,&mut input,&mut saved,&mut file_name,&mut line_name);command = String::new();},
                         KeyCode::Esc => {command = String::new();},
                         _ => ()
                     }
@@ -145,15 +153,19 @@ fn render(f:&mut  Frame<'_,CrosstermBackend<io::Stdout>>, app: App,edit_cursor:&
             text += "\n"
         }
     }
-    let output = Paragraph::new(app.output.to_string()).block(Block::default().borders(Borders::ALL).title(app.file_name.as_str()));
-    let input = Paragraph::new(text.as_ref()).block(Block::default().borders(Borders::ALL).title(app.file_name.as_str()));
     let command = Paragraph::new(vec![Spans::from(Span::raw(app.command))]).style(Style::default()).block(Block::default().borders(Borders::ALL).title(app.line_name.as_str()));
-    if *app.display_output {
+    if *app.display == Display::Output {
+        let output = Paragraph::new(app.output.to_string()).block(Block::default().borders(Borders::ALL).title("Output"));
         f.render_widget(output,chunks[0]);    
         f.set_cursor(chunks[0].x + 1, chunks[0].y + 1);
-    } else {
+    } else if *app.display == Display::Input {
+        let input = Paragraph::new(text.as_ref()).block(Block::default().borders(Borders::ALL).title(app.file_name.as_str()));
         f.render_widget(input,chunks[0]);   
         f.set_cursor(chunks[0].x + (*edit_cursor as u16) + 1 - (*scroll_x as u16), (*vert_cursor as u16) + chunks[0].y + 1 - (*scroll as u16));
+    } else if *app.display == Display::Help {
+        let help = Paragraph::new(HELP_MESSAGE).block(Block::default().borders(Borders::ALL).title(app.file_name.as_str()));
+        f.render_widget(help,chunks[0]);    
+        f.set_cursor(chunks[0].x + 1, chunks[0].y + 1);
     }
     f.render_widget(command, chunks[1]);
 }
@@ -199,7 +211,7 @@ fn find(command: &String,input:&Vec<String>,x:usize,y:usize) ->Option<(usize,usi
     }
     None
 }
-fn exc_command(command: &mut String,output:&mut String,mode: &mut Mode,dislplay_output: &mut bool,input:&mut Vec<String>,saved: &mut bool,file_name: &mut String,line_name:&mut String) {
+fn exc_command(command: &mut String,output:&mut String,mode: &mut Mode,dislplay: &mut Display,input:&mut Vec<String>,saved: &mut bool,file_name: &mut String,line_name:&mut String) {
     let mut pieces: Vec<&str> = command.split_ascii_whitespace().collect();
     if pieces.len() == 0 {
         return ();
@@ -212,11 +224,12 @@ fn exc_command(command: &mut String,output:&mut String,mode: &mut Mode,dislplay_
         "c" | "command" => {BtelCommand::Command},
         "f" | "find" => {BtelCommand::Find},
         "fq" | "force quit" => {BtelCommand::ForceQuit},
+        "h" | "help" => {BtelCommand::Help},
         _ => {BtelCommand::Error}
     };
     match btel_command {
         BtelCommand::Command if pieces.len() > 1 => {
-            *dislplay_output = true;
+            *dislplay = Display::Output;
             let mut exc_command = Command::new("bash");
             let mut shell_command = String::new();
             for piece in &pieces[1..] {
@@ -249,7 +262,8 @@ fn exc_command(command: &mut String,output:&mut String,mode: &mut Mode,dislplay_
         BtelCommand::Edit => {*mode = Mode::Edit},
         BtelCommand::ForceQuit => {*mode = Mode::ForceQuit},
         BtelCommand::Quit => {*mode = Mode::Quit},
-        BtelCommand::Find => {*mode = Mode::Find(0, 0)}       
-        _ => *line_name = String::from("Command not found.")
+        BtelCommand::Find => {*mode = Mode::Find(0, 0)}      
+        BtelCommand::Help => {*dislplay = Display::Help} 
+        _ => *line_name = String::from("Command not found."),
     }
 }

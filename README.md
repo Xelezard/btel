@@ -55,6 +55,13 @@ Used to execute a shell command **temporarily** replacing the text field
 
 > command echo Hello World
 
+#### Help
+"help" or "h"
+
+Display the help message again
+
+> help
+
 ### Modes
 Each mode has a command to switch to the corresponding mode
 
