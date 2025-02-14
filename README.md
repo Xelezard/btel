@@ -7,6 +7,7 @@ A simple text editor hobby project written in rust
 - Opening and Saving files
 - Scrolling
 - Searching for text
+- Executing shell commands
 
 ## Install
 To install run:
@@ -57,6 +58,8 @@ Used to execute a shell command **temporarily** replacing the text field
 ### Modes
 Each mode has a command to switch to the corresponding mode
 
+Press esc to go back to command mode
+
 > Mode Name -- Command
 > 
 > Mode usage
@@ -73,5 +76,5 @@ Press any key to exit Btel and not save anything.
 #### Find mode -- 'f' or 'find'
 Enter your pattern and hit enter to move the cursor to the next finding.
 
-#### Command mode -- 'c' or 'command'
+#### Command mode
 Enter a command to execute it
