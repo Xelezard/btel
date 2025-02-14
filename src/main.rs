@@ -7,15 +7,22 @@ use crossterm::{
 };
 #[derive(Clone, Copy,Debug,PartialEq)]
 enum Mode {
-    Mode,
+    Edit,
+    Quit,
+    ForceQuit,
+    Find(usize,usize),
+    Command
+}
+#[derive(Clone, Copy,Debug,PartialEq)]
+enum BtelCommand {
     Edit,
     Error,
     Quit,
     ForceQuit,
+    Find,
+    Command,
     Open,
-    Save,
-    Find(usize,usize),
-    Command
+    Save
 }
 #[derive(Debug)]
 struct App<'a>{
@@ -25,6 +32,7 @@ struct App<'a>{
     command: &'a String,
     line_name: &'a String,
     file_name: &'a String,
+    display_output: &'a bool,
 }
 fn main() -> Result<(), io::Error> {
     // setup terminal
@@ -51,55 +59,27 @@ fn run(terminal:&mut Terminal<CrosstermBackend<io::Stdout>>) -> Result<(),Error>
     let mut input: Vec<String> = vec![String::new()];
     let mut output: String = String::new();
     let mut vert_cursor:usize = 0;
-    let mut mode = Mode::Mode;
+    let mut mode = Mode::Command;
     let mut command = String::new();
     let mut edit_cursor:usize = 0;
-    let mut line_name = String::from("Mode");
+    let mut line_name = String::from("Command");
     let mut file_name = String::from("New File");
     let mut saved: bool = true;
     let mut scroll_y:usize = 0;
     let mut scroll_x:usize = 0;
+    let mut display_output = false;
     loop {
-        let _ = terminal.draw(|f|render(f, App {mode: mode,input: &input,command: &command,line_name: &line_name,file_name: &file_name,output: &output},&mut edit_cursor,&mut vert_cursor,&mut scroll_y,&mut scroll_x));
+        let _ = terminal.draw(|f|render(f, App {mode: mode,input: &input,command: &command,line_name: &line_name,file_name: &file_name,output: &output,display_output: &display_output},&mut edit_cursor,&mut vert_cursor,&mut scroll_y,&mut scroll_x));
         if let Event::Key(key) = event::read().unwrap() {
             match mode {
-                Mode::Mode => {
-                    line_name = String::from("Mode");
-                    match key.code {
-                        KeyCode::Char(x) => {command += &x.to_string();},
-                        KeyCode::Backspace => {let _ = command.pop();},
-                        KeyCode::Enter => {mode = get_mode(&command,&mut line_name);command = String::new()},
-                        KeyCode::Esc => command = String::new(),
-                        _ => ()
-                    }
-                },
                 Mode::Command => {
                     line_name = String::from("Command");
+                    display_output = false;
                     match key.code {
                         KeyCode::Char(x) => {command += &x.to_string();},
                         KeyCode::Backspace => {let _ = command.pop();},
-                        KeyCode::Enter => {exc_command(&command,&mut output);command = String::new();},
-                        KeyCode::Esc => {command = String::new();mode = Mode::Mode;line_name = String::from("Mode");},
-                        _ => ()
-                    }
-                },
-                Mode::Open => {
-                    line_name = String::from("Open");
-                    match key.code {
-                        KeyCode::Char(x) => command += &x.to_string(),
-                        KeyCode::Backspace => {let _ = command.pop();},
-                        KeyCode::Enter => {if let Some(file) = open(&command){input = file;mode = Mode::Mode;line_name = String::from("Mode");file_name = String::from(command);saved = true}else {line_name = String::from("File not found")}command = String::new()},
-                        KeyCode::Esc => {command = String::new();mode = Mode::Mode;line_name = String::from("Mode")},
-                        _ => ()
-                    }
-                },
-                Mode::Save => {
-                    line_name = String::from("Save");
-                    match key.code {
-                        KeyCode::Char(x) => command += &x.to_string(),
-                        KeyCode::Backspace => {let _ = command.pop();},
-                        KeyCode::Enter => {save(&command,&mut file_name,&input,&mut saved);mode = Mode::Mode;line_name = String::from("Mode");command = String::new()},
-                        KeyCode::Esc => {command = String::new();mode = Mode::Mode;line_name = String::from("Mode")},
+                        KeyCode::Enter => {exc_command(&mut command,&mut output,&mut mode,&mut display_output,&mut input,&mut saved,&mut file_name,&mut line_name);command = String::new();},
+                        KeyCode::Esc => {command = String::new();},
                         _ => ()
                     }
                 },
@@ -109,7 +89,7 @@ fn run(terminal:&mut Terminal<CrosstermBackend<io::Stdout>>) -> Result<(),Error>
                         KeyCode::Char(x) => {command += &x.to_string();mode = Mode::Find(0, 0)},
                         KeyCode::Backspace => {let _ = command.pop();mode = Mode::Find(0, 0)},
                         KeyCode::Enter => {if let Some((x_cursor,y_cursor)) = find(&command, &input,x,y){vert_cursor = y_cursor;edit_cursor = x_cursor;mode = Mode::Find(x_cursor +1, y_cursor)} else if x == 0 && y == 0{line_name = String::from("Pattern not found")}else {mode = Mode::Find(0, 0)}}
-                        KeyCode::Esc => {command = String::new();mode = Mode::Mode;line_name = String::from("Mode")},
+                        KeyCode::Esc => {command = String::new();mode = Mode::Command;line_name = String::from("Command")},
                         _ => ()
                     }
                 },
@@ -118,15 +98,14 @@ fn run(terminal:&mut Terminal<CrosstermBackend<io::Stdout>>) -> Result<(),Error>
                     KeyCode::Backspace => {if edit_cursor != 0 {if edit_cursor +1== input[vert_cursor].len() {let _ = input[vert_cursor].pop();} else {let _ = input[vert_cursor].remove(edit_cursor -1);edit_cursor -= 1;saved = false}}else if vert_cursor != 0{let rest = input.remove(vert_cursor);input[vert_cursor-1] += &rest;vert_cursor -= 1;edit_cursor = input[vert_cursor].len() - rest.len()} },
                     KeyCode::Delete => {if edit_cursor != input[vert_cursor].len() {if edit_cursor + 1 == input[vert_cursor].len() {let _ = input[vert_cursor].pop();}else {let _ = input[vert_cursor].remove(edit_cursor + 1);/*edit_cursor -= 1;*/}}else if vert_cursor +1 != input.len(){let rest = input.remove(vert_cursor +1); input[vert_cursor] += &rest}saved = false},
                     KeyCode::Enter => {let line = input[vert_cursor].split_off(edit_cursor);input.insert(vert_cursor+1,line)/*input += &"\n".to_string()*/;vert_cursor += 1; if input[vert_cursor].len() < edit_cursor +2 {edit_cursor = input[vert_cursor].len()}},
-                    KeyCode::Esc => {mode = Mode::Mode;line_name = String::from("Mode")},
+                    KeyCode::Esc => {mode = Mode::Command;line_name = String::from("Command")},
                     KeyCode::Left => {if edit_cursor != 0 {edit_cursor -= 1} else if vert_cursor != 0 {vert_cursor -=1;edit_cursor = input[vert_cursor].len()}},
                     KeyCode::Right => if edit_cursor +1 <= input[vert_cursor].len() {edit_cursor  +=1}else if vert_cursor +1 != input.len(){vert_cursor +=1;edit_cursor = 0},
                     KeyCode::Up => if vert_cursor != 0 {vert_cursor -= 1; if input[vert_cursor].len() < edit_cursor +2 {edit_cursor = input[vert_cursor].len()}},
                     KeyCode::Down => if vert_cursor +2 <= input.len() {vert_cursor += 1; if input[vert_cursor].len() < edit_cursor +2 {edit_cursor = input[vert_cursor].len()}},
                     _ => ()
                 },
-                Mode::Error => {mode = Mode::Mode;line_name = String::from("Mode")},
-                Mode::Quit => if saved {return Ok(())} else {mode = Mode::Error;line_name = String::from("Unsaved changes use fq to quit anyway")},
+                Mode::Quit => if saved {return Ok(())} else {mode = Mode::Command;line_name = String::from("Unsaved changes use fq to quit anyway")},
                 Mode::ForceQuit => return Ok(()),
             }
         }
@@ -169,7 +148,7 @@ fn render(f:&mut  Frame<'_,CrosstermBackend<io::Stdout>>, app: App,edit_cursor:&
     let output = Paragraph::new(app.output.to_string()).block(Block::default().borders(Borders::ALL).title(app.file_name.as_str()));
     let input = Paragraph::new(text.as_ref()).block(Block::default().borders(Borders::ALL).title(app.file_name.as_str()));
     let command = Paragraph::new(vec![Spans::from(Span::raw(app.command))]).style(Style::default()).block(Block::default().borders(Borders::ALL).title(app.line_name.as_str()));
-    if app.mode == Mode::Command {
+    if *app.display_output {
         f.render_widget(output,chunks[0]);    
         f.set_cursor(chunks[0].x + 1, chunks[0].y + 1);
     } else {
@@ -177,19 +156,6 @@ fn render(f:&mut  Frame<'_,CrosstermBackend<io::Stdout>>, app: App,edit_cursor:&
         f.set_cursor(chunks[0].x + (*edit_cursor as u16) + 1 - (*scroll_x as u16), (*vert_cursor as u16) + chunks[0].y + 1 - (*scroll as u16));
     }
     f.render_widget(command, chunks[1]);
-}
-fn get_mode(command: &String,line_name: &mut String) -> Mode {
-   //println!("{:?}",command);
-    return match command.as_str() {
-        "e" | "edit" => Mode::Edit,
-        "q" | "quit" => Mode::Quit,
-        "o" | "open" => {*line_name = String::from("Open");Mode::Open},
-        "s" | "save" => {*line_name = String::from("Save");Mode::Save},
-        "c" | "command" => {*line_name = String::from("Command");Mode::Command},
-        "f" | "find" => {*line_name = String::from("Find");Mode::Find(0,0)},
-        "fq" | "force quit" => {*line_name = String::from("Force Quit");Mode::ForceQuit},
-        _ => {*line_name = String::from("Error - Mode not found");Mode::Error}
-    };
 }
 fn open(command: &String) -> Option<Vec<String>>{
     let file_option =fs::read_to_string(command);
@@ -233,17 +199,57 @@ fn find(command: &String,input:&Vec<String>,x:usize,y:usize) ->Option<(usize,usi
     }
     None
 }
-fn exc_command(command: &String,output:&mut String) {
-    let mut exc_command = Command::new("bash");
-    exc_command.arg("-c").arg(command);
-    let mut result = String::new();
-    if let Ok(output) = exc_command.output(){
-        if let Ok(stdout) = String::from_utf8(output.stdout){
-            result += &stdout;
-        }
-        if let Ok(stdout) = String::from_utf8(output.stderr){
-            result += &stdout;
-        }
+fn exc_command(command: &mut String,output:&mut String,mode: &mut Mode,dislplay_output: &mut bool,input:&mut Vec<String>,saved: &mut bool,file_name: &mut String,line_name:&mut String) {
+    let mut pieces: Vec<&str> = command.split_ascii_whitespace().collect();
+    if pieces.len() == 0 {
+        return ();
     }
-    *output = result
+    let btel_command = match pieces[0] {
+        "e" | "edit" => BtelCommand::Edit,
+        "q" | "quit" => BtelCommand::Quit,
+        "o" | "open" => {BtelCommand::Open},
+        "s" | "save" => {BtelCommand::Save},
+        "c" | "command" => {BtelCommand::Command},
+        "f" | "find" => {BtelCommand::Find},
+        "fq" | "force quit" => {BtelCommand::ForceQuit},
+        _ => {BtelCommand::Error}
+    };
+    match btel_command {
+        BtelCommand::Command if pieces.len() > 1 => {
+            *dislplay_output = true;
+            let mut exc_command = Command::new("bash");
+            let mut shell_command = String::new();
+            for piece in &pieces[1..] {
+                shell_command += piece;
+                shell_command += " "
+            }
+            exc_command.arg("-c").arg(shell_command);
+            let mut result = String::new();
+            if let Ok(output) = exc_command.output(){
+                if let Ok(stdout) = String::from_utf8(output.stdout){
+                    result += &stdout;
+                }
+                if let Ok(stdout) = String::from_utf8(output.stderr){
+                    result += &stdout;
+                }
+            }
+            *output = result
+        },
+        BtelCommand::Open if pieces.len() == 2 => {
+            if let Some(file) = open(&pieces[1].to_string()) {
+                *input = file;
+                *file_name = String::from(pieces[1]);
+                *saved = true
+            } else {
+                *line_name = String::from("File not found")
+            }
+            *command = String::new()
+        },
+        BtelCommand::Save => {pieces.push("");save(&pieces[1].to_string(),file_name,&input,saved);}
+        BtelCommand::Edit => {*mode = Mode::Edit},
+        BtelCommand::ForceQuit => {*mode = Mode::ForceQuit},
+        BtelCommand::Quit => {*mode = Mode::Quit},
+        BtelCommand::Find => {*mode = Mode::Find(0, 0)}       
+        _ => *line_name = String::from("Command not found.")
+    }
 }

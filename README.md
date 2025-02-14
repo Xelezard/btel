@@ -14,20 +14,52 @@ To install run:
 cargo install --git https://github.com/xelezard/btel.git
 ```
 ## Usage
-When opening Btel you see two fields the "New File" and the "Mode" block.
-Currently, you are in "Mode" mode.
-Type a mode abreviation into the mode field to enter that mode.
-To go back to "Mode" mode use the esc key except the mode that your currently in states otherwise
+When opening Btel you see two fields the "New File" and the "Command" block.
+
+Currently, you are in "Command" mode.
+
+Type a command into "Command" field to execute it. (Command explanation below)
+
+Use the "edit" command to go into edit mode.
+
+### Commands
+Note: commands used only to switch modes aren't listed here
+
+Note: each Command may have a shorter version
+
+#### Open
+"open" or "o"
+
+Used to open a file replacing the current one
+
+> open file.txt
+
+#### Save 
+"save" or "s"
+
+Used to save the file
+
+If no file was supplied and the file name is known, the file will be saved to the same location
+
+> save file.txt
+
+or if the file has previously been saved
+
+> save
+
+#### Command
+"command" or "c"
+
+Used to execute a shell command **temporarily** replacing the text field
+
+> command echo Hello World
 
 ### Modes
-> Mode Name -- Mode abreviation
+Each mode has a command to switch to the corresponding mode
+
+> Mode Name -- Command
 > 
 > Mode usage
-
-#### Mode mode
-Enter a mode abreviation and press enter to switch to that mode.
-
-Press escape to clear the input field.
 
 #### Edit mode -- 'e' or 'edit' 
 In this mode you can write to the file.
@@ -38,21 +70,8 @@ Press any key to exit Btel if all changes are saved.
 #### Force Quit mode -- 'fq' or 'force quit'
 Press any key to exit Btel and not save anything.
 
-#### Open mode -- 'o' or 'open'
-Enter your file path inside of the "Open" field to open that file.
-
-#### Save mode -- 's' or 'save'
-To save type your desired file path into the "Save" field.
-
-If your upper field doesn't read "New File" anymore and you enter no file path it will save to the previously entered file path.
-
 #### Find mode -- 'f' or 'find'
 Enter your pattern and hit enter to move the cursor to the next finding.
 
 #### Command mode -- 'c' or 'command'
-Enter a command to run it with the bash shell temporarily replacing the text field
-
-#### Error mode
-This mode will load when an error occurs and it will display an error message on the lower text field.
-
-Press any key to go back to Mode mode.
+Enter a command to execute it
