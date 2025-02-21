@@ -119,12 +119,16 @@ fn render(f:&mut  Frame<'_,CrosstermBackend<io::Stdout>>, app: App,edit_cursor:&
     let mut text = String::new();
     if app.input.len() <= (*scroll + (chunks[0].height as usize)+2) {
         for line in &app.input[*scroll..] {
-            text += &line[*scroll_x..];
+            if *scroll_x < line.len() {
+                text += &line[*scroll_x..];
+            } 
             text += "\n"
         }
     } else {
         for line in &app.input[*scroll..(*scroll + (chunks[0].height as usize) -1)] {
-            text += &line[*scroll_x..];
+            if *scroll_x < line.len() {
+                text += &line[*scroll_x..];
+            }
             text += "\n"
         }
     }
