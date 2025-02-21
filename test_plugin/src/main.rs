@@ -4,7 +4,6 @@ use std::fs;
 fn main() {
     let args = std::env::args().collect();
     let mut vars = get_btel_vars(args);
-    fs::write("/home/xelemander/grass_saas.txt",&format!("{:?}",vars.args));
     vars.display = Display::Output;
     let mut exc_command = Command::new("bash");
     exc_command.arg("-c").arg(vars.args.clone().unwrap().join(" "));
