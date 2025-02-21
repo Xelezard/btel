@@ -108,7 +108,7 @@ Note: a command can have infinite command versions
 To write a plugin first of all import btel
 
 ```bash
-cargo add --git https://github.com/Xelezard/btel
+cargo add --git https://github.com/Xelezard/btel btel
 ```
 
 A plugin must allways be built up like this:

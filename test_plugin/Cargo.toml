@@ -4,4 +4,4 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-btel = { version = "0.1.0", path = "../btel" }
+btel = { git = "https://github.com/Xelezard/btel", version = "0.1.0" }
