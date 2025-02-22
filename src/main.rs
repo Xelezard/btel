@@ -1,11 +1,12 @@
 use std::{fmt::Error, fs::{self, File}, io::{self, Write}, process::Command};
 use tui::{
-    backend::CrosstermBackend, layout::{Constraint, Direction, Layout}, style::Style, text::{Span, Spans}, widgets::{Block, Borders, Paragraph}, Frame, Terminal
+    backend::CrosstermBackend, layout::{Constraint, Direction, Layout}, style::Style, text::{Span, Spans, Text}, widgets::{Block, Borders, Paragraph}, Frame, Terminal
 };
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode}, execute, terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen}
 };
 use btel::*;
+mod highlight;
 const HELP_MESSAGE: &str = "Welcome to Btel!\n\nMost needed commands:\n\"e\" - switch to edit mode,\n\"q\" - quit if everything is saved\n\nfor more information please read the part in the README.md\nhttps://github.com/Xelezard/btel";
 #[cfg(target_os = "windows")]
 compile_error!("This crate does not support Windows.");
@@ -132,13 +133,17 @@ fn render(f:&mut  Frame<'_,CrosstermBackend<io::Stdout>>, app: App,edit_cursor:&
             text += "\n"
         }
     }
-    let command = Paragraph::new(vec![Spans::from(Span::raw(app.command))]).style(Style::default()).block(Block::default().borders(Borders::ALL).title(app.line_name.as_str()));
+    let text_spans = match app.file_name {
+        x if x.ends_with(".rs")=> highlight::rust_highlight(&text),
+        _ => Text::from(text)
+    };
+    let command = Paragraph::new(Spans::from(vec![Span::raw(app.command)])).style(Style::default()).block(Block::default().borders(Borders::ALL).title(app.line_name.as_str()));
     if *app.display == Display::Output {
         let output = Paragraph::new(app.output.to_string()).block(Block::default().borders(Borders::ALL).title("Output"));
         f.render_widget(output,chunks[0]);    
         f.set_cursor(chunks[0].x + 1, chunks[0].y + 1);
     } else if *app.display == Display::Input {
-        let input = Paragraph::new(text.as_ref()).block(Block::default().borders(Borders::ALL).title(app.file_name.as_str()));
+        let input = Paragraph::new(text_spans).block(Block::default().borders(Borders::ALL).title(app.file_name.as_str()));
         f.render_widget(input,chunks[0]);   
         f.set_cursor(chunks[0].x + (*edit_cursor as u16) + 1 - (*scroll_x as u16), (*vert_cursor as u16) + chunks[0].y + 1 - (*scroll as u16));
     } else if *app.display == Display::Help {
