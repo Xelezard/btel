@@ -3,12 +3,14 @@
 
 A simple text editor hobby project written in rust
 
+![alt text](screenshot.png)
 ## Features
 - Opening and Saving files
 - Scrolling
 - Searching for text
 - Executing shell commands
 - Plugin support
+- Syntax highlightin (only for rust)
 
 ## Install
 To install run:
