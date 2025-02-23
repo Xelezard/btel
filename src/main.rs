@@ -1,6 +1,6 @@
 use std::{fmt::Error, fs::{self, File}, io::{self, Write}, process::Command};
 use tui::{
-    backend::CrosstermBackend, layout::{Constraint, Direction, Layout}, style::Style, text::{Span, Spans, Text}, widgets::{Block, Borders, Paragraph}, Frame, Terminal
+    backend::CrosstermBackend, layout::{Constraint, Direction, Layout}, text::{Span, Spans, Text}, widgets::{Block, Borders, Paragraph}, Frame, Terminal
 };
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode}, execute, terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen}
@@ -132,7 +132,7 @@ fn render(f:&mut  Frame<'_,CrosstermBackend<io::Stdout>>, app: App,edit_cursor:&
         let on_screen = Text::from(text_spans.lines.drain(*scroll..(*scroll + (chunks[0].height as usize) -1)).as_slice().iter().map(|l|l.clone()).collect::<Vec<Spans>>());
         text_spans = on_screen
     }
-    let command = Paragraph::new(Spans::from(vec![Span::raw(app.command)])).style(Style::default()).block(Block::default().borders(Borders::ALL).title(app.line_name.as_str()));
+    let command = Paragraph::new(Spans::from(vec![Span::raw(app.command)])).block(Block::default().borders(Borders::ALL).title(app.line_name.as_str()));
     if *app.display == Display::Output {
         let output = Paragraph::new(app.output.to_string()).block(Block::default().borders(Borders::ALL).title("Output"));
         f.render_widget(output,chunks[0]);    
