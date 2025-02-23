@@ -79,14 +79,15 @@ fn run(terminal:&mut Terminal<CrosstermBackend<io::Stdout>>) -> Result<(),Error>
                 },
                 Mode::Edit => match key.code {
                     KeyCode::Char(x) => {if x.is_ascii() {input[vert_cursor].insert(edit_cursor, x)/*input += &x.to_string()*/;edit_cursor += 1;saved = false}},
-                    KeyCode::Backspace => {if edit_cursor != 0 {if edit_cursor +1== input[vert_cursor].len() {let _ = input[vert_cursor].pop();} else {let _ = input[vert_cursor].remove(edit_cursor -1);edit_cursor -= 1;saved = false}}else if vert_cursor != 0{let rest = input.remove(vert_cursor);input[vert_cursor-1] += &rest;vert_cursor -= 1;edit_cursor = input[vert_cursor].len() - rest.len()} },
+                    KeyCode::Backspace => {if edit_cursor != 0 {if edit_cursor == input[vert_cursor].len() {let _ = input[vert_cursor].pop();edit_cursor -= 1} else {let _ = input[vert_cursor].remove(edit_cursor -1);edit_cursor -= 1;saved = false}}else if vert_cursor != 0{let rest = input.remove(vert_cursor);input[vert_cursor-1] += &rest;vert_cursor -= 1;edit_cursor = input[vert_cursor].len() - rest.len()} },
                     KeyCode::Delete => {if edit_cursor != input[vert_cursor].len() {if edit_cursor + 1 == input[vert_cursor].len() {let _ = input[vert_cursor].pop();}else {let _ = input[vert_cursor].remove(edit_cursor + 1);/*edit_cursor -= 1;*/}}else if vert_cursor +1 != input.len(){let rest = input.remove(vert_cursor +1); input[vert_cursor] += &rest}saved = false},
-                    KeyCode::Enter => {let line = input[vert_cursor].split_off(edit_cursor);input.insert(vert_cursor+1,line)/*input += &"\n".to_string()*/;vert_cursor += 1; if input[vert_cursor].len() < edit_cursor +2 {edit_cursor = input[vert_cursor].len()}},
+                    KeyCode::Enter => {let line = input[vert_cursor].split_off(edit_cursor);input.insert(vert_cursor+1,line)/*input += &"\n".to_string()*/;vert_cursor += 1;edit_cursor = 0;},
                     KeyCode::Esc => {mode = Mode::Command;line_name = String::from("Command")},
                     KeyCode::Left => {if edit_cursor != 0 {edit_cursor -= 1} else if vert_cursor != 0 {vert_cursor -=1;edit_cursor = input[vert_cursor].len()}},
                     KeyCode::Right => if edit_cursor +1 <= input[vert_cursor].len() {edit_cursor  +=1}else if vert_cursor +1 != input.len(){vert_cursor +=1;edit_cursor = 0},
                     KeyCode::Up => if vert_cursor != 0 {vert_cursor -= 1; if input[vert_cursor].len() < edit_cursor +2 {edit_cursor = input[vert_cursor].len()}},
                     KeyCode::Down => if vert_cursor +2 <= input.len() {vert_cursor += 1; if input[vert_cursor].len() < edit_cursor +2 {edit_cursor = input[vert_cursor].len()}},
+                    KeyCode::Tab => {for _ in 0..4 {input[vert_cursor].insert(edit_cursor, ' ');}edit_cursor += 4;saved = false}
                     _ => ()
                 },
                 Mode::Quit => if saved {return Ok(())} else {mode = Mode::Command;line_name = String::from("Unsaved changes use fq to quit anyway")},
@@ -106,9 +107,10 @@ fn render(f:&mut  Frame<'_,CrosstermBackend<io::Stdout>>, app: App,edit_cursor:&
     }
     )
     .split(f.size());
-    if *vert_cursor  > (*scroll + (chunks[0].height as usize) -3) {
+    while *vert_cursor  > (*scroll + (chunks[0].height as usize) -3) {
         *scroll += 1
-    }else if *vert_cursor < *scroll  {
+    }
+    while *vert_cursor < *scroll  {
         *scroll -= 1
     }
     while *edit_cursor  > (*scroll_x + (chunks[0].width as usize) -3) {
@@ -117,33 +119,26 @@ fn render(f:&mut  Frame<'_,CrosstermBackend<io::Stdout>>, app: App,edit_cursor:&
     while *edit_cursor < *scroll_x  {
         *scroll_x -= 1
     }
-    let mut text = String::new();
-    if app.input.len() <= (*scroll + (chunks[0].height as usize)+2) {
-        for line in &app.input[*scroll..] {
-            if *scroll_x < line.len() {
-                text += &line[*scroll_x..];
-            } 
-            text += "\n"
-        }
-    } else {
-        for line in &app.input[*scroll..(*scroll + (chunks[0].height as usize) -1)] {
-            if *scroll_x < line.len() {
-                text += &line[*scroll_x..];
-            }
-            text += "\n"
-        }
-    }
-    let text_spans = match app.file_name {
+    let text = app.input.join("\n");
+    let mut  text_spans = match app.file_name {
         x if x.ends_with(".rs")=> highlight::rust_highlight(&text),
+        x if x.ends_with(".json") => highlight::json_highlight(&text),
         _ => Text::from(text)
     };
+    if app.input.len() <= (*scroll + (chunks[0].height as usize)+2) {
+        let on_screnn = Text::from(text_spans.lines.drain(*scroll..).as_slice().iter().map(|l|l.clone()).collect::<Vec<Spans>>());
+        text_spans = on_screnn
+    } else {
+        let on_screen = Text::from(text_spans.lines.drain(*scroll..(*scroll + (chunks[0].height as usize) -1)).as_slice().iter().map(|l|l.clone()).collect::<Vec<Spans>>());
+        text_spans = on_screen
+    }
     let command = Paragraph::new(Spans::from(vec![Span::raw(app.command)])).style(Style::default()).block(Block::default().borders(Borders::ALL).title(app.line_name.as_str()));
     if *app.display == Display::Output {
         let output = Paragraph::new(app.output.to_string()).block(Block::default().borders(Borders::ALL).title("Output"));
         f.render_widget(output,chunks[0]);    
         f.set_cursor(chunks[0].x + 1, chunks[0].y + 1);
     } else if *app.display == Display::Input {
-        let input = Paragraph::new(text_spans).block(Block::default().borders(Borders::ALL).title(app.file_name.as_str()));
+        let input = Paragraph::new(text_spans).scroll((0,(*scroll_x as u16))).block(Block::default().borders(Borders::ALL).title(app.file_name.as_str()));
         f.render_widget(input,chunks[0]);   
         f.set_cursor(chunks[0].x + (*edit_cursor as u16) + 1 - (*scroll_x as u16), (*vert_cursor as u16) + chunks[0].y + 1 - (*scroll as u16));
     } else if *app.display == Display::Help {
@@ -233,11 +228,12 @@ fn exc_command(command: &mut String,output:&mut String,mode: &mut Mode,display: 
             if let Some(file) = open(&pieces[1].to_string()) {
                 *input = file;
                 *file_name = String::from(pieces[1]);
-                *saved = true
+                *saved = true;
+                *vert_cursor = 0;
+                *edit_cursor = 0;
             } else {
                 *line_name = String::from("File not found")
             }
-            *command = String::new()
         },
         BtelCommand::Save => {pieces.push("");save(&pieces[1].to_string(),file_name,&input,saved);}
         BtelCommand::Edit => {*mode = Mode::Edit},
