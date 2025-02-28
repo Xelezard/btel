@@ -9,14 +9,14 @@ pub fn rust_highlight(text: &String) -> Text<'static> {
     color_brackets(&mut spans, "(", ")");
     color_brackets(&mut spans, "[", "]");
     color_brackets(&mut spans, "<", ">");
-    color(&mut spans, vec![(Regex::new(r"(#(!)*\[[^\]]+\]|!|\?|;|&|(-|\+|\*|/)*=(>|<|=)*| >|< |\+ |\- |\*| / |->)").unwrap(),Style::default().fg(Color::Rgb(156, 1, 10))),(Regex::new(r"\d").unwrap(),Style::default().fg(Color::Rgb(223, 123, 123))),(Regex::new("[a-z]*\"[^\"]*\"").unwrap(),Style::default().fg(Color::Rgb(2, 80, 0))),(Regex::new(r"(//[^\n]+|/\*[^(*/)]+\*/)").unwrap(),Style::default().add_modifier(Modifier::DIM).fg(Color::DarkGray))], text);
+    color(&mut spans, vec![(Regex::new(r"(#(!)*\[[^\]]+\]|!|\?|;|&|(-|\+|\*|/)*=(>|<|=)*| >|< |\+ |\- |\*| / |->)").unwrap(),Style::default().fg(Color::Rgb(156, 1, 10))),(Regex::new(r"\d").unwrap(),Style::default().fg(Color::Rgb(223, 123, 123))),(Regex::new("[a-z]*\"[^(\\*\")]*\"").unwrap(),Style::default().fg(Color::Rgb(2, 80, 0))),(Regex::new(r"(//[^\n]+|/\*[^(*/)]+\*/)").unwrap(),Style::default().add_modifier(Modifier::DIM).fg(Color::DarkGray))], text);
     text_from_spans(spans)
 }
 pub fn json_highlight(text: &String) -> Text<'_>{
     let mut spans: Vec<Span> = text.chars().map(|c|Span::styled(c.to_string(), Style::default())).collect();
     color_brackets(&mut spans, "{", "}");
     color_brackets(&mut spans, "[", "]");
-    color(&mut spans, vec![(Regex::new(r":").unwrap(),Style::default().fg(Color::Rgb(0, 0, 200))),(Regex::new(r"\d").unwrap(),Style::default().fg(Color::Rgb(223, 123, 123))),(Regex::new(r"(true|false)").unwrap(),Style::default().fg(Color::LightMagenta)),(Regex::new("[a-z]*\"[^\"]*\"").unwrap(),Style::default().fg(Color::Rgb(2, 80, 0)))], text);
+    color(&mut spans, vec![(Regex::new(r":").unwrap(),Style::default().fg(Color::Rgb(0, 0, 200))),(Regex::new(r"\d").unwrap(),Style::default().fg(Color::Rgb(223, 123, 123))),(Regex::new(r"(true|false)").unwrap(),Style::default().fg(Color::LightMagenta)),(Regex::new("[a-z]*\"[^(\\*\")]*\"").unwrap(),Style::default().fg(Color::Rgb(2, 80, 0)))], text);
     text_from_spans(spans)
 }
 fn text_from_spans(spans: Vec<Span>) -> Text {

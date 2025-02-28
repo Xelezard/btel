@@ -53,6 +53,7 @@ fn run(terminal:&mut Terminal<CrosstermBackend<io::Stdout>>) -> Result<(),Error>
     let commands: Vec<Extern> = load_commands(commands);
     if args.len() == 2 {display = Display::Input;exc_command(&mut format!("o {}", args[1]),&mut output,&mut mode,&mut display,&mut input,&mut saved,&mut file_name,&mut line_name,&commands,&mut edit_cursor,&mut vert_cursor,&mut scroll_x,&mut scroll_y)}
     loop {
+        let _ =terminal.clear();
         let _ = terminal.draw(|f|render(f, App {mode: mode,input: &input,command: &command,line_name: &line_name,file_name: &file_name,output: &output,display: &display},&mut edit_cursor,&mut vert_cursor,&mut scroll_y,&mut scroll_x));
         if let Event::Key(key) = event::read().unwrap() {
             match mode {
@@ -151,6 +152,10 @@ fn render(f:&mut  Frame<'_,CrosstermBackend<io::Stdout>>, app: App,edit_cursor:&
 fn open(command: &String) -> Option<Vec<String>>{
     let file_option =fs::read_to_string(command);
     if let Ok(file) = file_option {
+        if !file.is_ascii() {
+            return None;
+        }
+        let file = file.replace("\t", "    ");
         let split:Vec<&str> = file.split("\n").collect();
         let s: Vec<String> = split.iter().map(|f|f.to_string()).collect();
         return Some(s);
