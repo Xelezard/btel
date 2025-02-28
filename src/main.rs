@@ -64,7 +64,16 @@ fn run(terminal:&mut Terminal<CrosstermBackend<io::Stdout>>,config_tree: &mut Ro
     let mut display = Display::Help;
     let commands: Vec<Extern> = load_commands(config_tree)?;
     if args.len() == 2 {display = Display::Input;exc_command(&mut format!("o {}", args[1]),&mut output,&mut mode,&mut display,&mut input,&mut saved,&mut file_name,&mut line_name,&commands,&mut edit_cursor,&mut vert_cursor,&mut scroll_x,&mut scroll_y)}
+    #[cfg(target_os = "windows")]
+    let typed = false;
     loop {
+        #[cfg(target_os = "windows")]
+        if typed {
+            typed = false;
+            continue;
+        } else {
+            typed = true
+        }
         let _ = terminal.draw(|f|render(f, App {mode: mode,input: &input,command: &command,line_name: &line_name,file_name: &file_name,output: &output,display: &display},&mut edit_cursor,&mut vert_cursor,&mut scroll_y,&mut scroll_x));
         if let Event::Key(key) = event::read().unwrap() {
             match mode {
