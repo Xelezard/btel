@@ -91,23 +91,33 @@ Enter your pattern and hit enter to move the cursor to the next finding.
 #### Command mode
 Enter a command to execute it
 
+## Configuration
+The config file is located at:
+
+linux -> ~/.btel/config.tr
+windows -> %AppData%/btel/config.tr
+
+As of now there is only one thing you can configure, plugins
+
+Configure your plugins like this
+```
+commands -> alt text
+| cmd1 or cmd2 -> path/to/plugin
+| other_cmd1 or other_cmd2 -> path/to/other/plugin
+```
+
+Note: you can technically have infinite commands for one plugin
+```
+| cmd1 or cmd2 or cmd3 or cmd4 ...
+```
+
 ## Plugins
-Plugins are external commands configured in the 'command.txt' file located at
-~/.btel/command.txt
+Plugins are external commands configured in the 'commands' section of the config.tr
 
 A test plugin is located at [test_plugin/](test_plugin/)
 
 Note: currently there is no way to automatically generate the 'command.txt'
 so it must be configured manually
-### command.txt
-Each line corresponds to one command and is constructed like this
-
-> command1 command2 path/of_executable
-
-Note: a command can have infinite command versions
-
-> cmd1 cmd2 cmd3 cmd4 cmd5 ... path/to/executable
-
 ### Writing plugins
 To write a plugin first of all import btel
 

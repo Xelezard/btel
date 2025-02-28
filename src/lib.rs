@@ -72,6 +72,7 @@ pub struct BtelVars {
     pub display: Display,
     pub args: Option<Vec<String>>
 }
+#[derive(Debug)]
 pub struct Extern {
     pub names: Vec<String>,
     pub path: String

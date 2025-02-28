@@ -7,9 +7,9 @@ use crossterm::{
 };
 use btel::*;
 mod highlight;
-const HELP_MESSAGE: &str = "Welcome to Btel!\n\nMost needed commands:\n\"e\" - switch to edit mode,\n\"q\" - quit if everything is saved\n\nfor more information please read the part in the README.md\nhttps://github.com/Xelezard/btel";
-#[cfg(target_os = "windows")]
-compile_error!("This crate does not support Windows.");
+use tree::Root;
+const HELP_MESSAGE: &str = include_str!("../HELP.msg");
+const DEFAULT_CONFIG_FILE: &str = include_str!("../config.tr");
 fn main() -> Result<(), io::Error> {
     // setup terminal
     enable_raw_mode()?;
@@ -17,13 +17,8 @@ fn main() -> Result<(), io::Error> {
     execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
-    if !std::path::Path::new(&format!("{}/.btel",env!("HOME"))).exists() {
-        let _ = std::fs::create_dir(format!("{}/.btel",env!("HOME")));
-        let mut extern_modes = File::create_new(format!("{}/.btel/command.txt",env!("HOME")))?;
-        extern_modes.write_all(b"")?;
-    }
-    let _ = run(&mut terminal);
-
+    let mut config_tree = btel_init()?;
+    let _ = run(&mut terminal,&mut config_tree);
     // restore terminal
     disable_raw_mode()?;
     execute!(
@@ -35,7 +30,25 @@ fn main() -> Result<(), io::Error> {
 
     Ok(())
 }
-fn run(terminal:&mut Terminal<CrosstermBackend<io::Stdout>>) -> Result<(),Error>{
+#[cfg(target_os = "linux")]
+fn btel_init() -> Result<Root<String>,std::io::Error>{
+    if !std::path::Path::new(&format!("{}/.btel",env!("HOME"))).exists() {
+        let _ = std::fs::create_dir(format!("{}/.btel",env!("HOME")));
+        let mut extern_modes = File::create_new(format!("{}/.btel/config.tr",env!("HOME")))?;
+        extern_modes.write_all(DEFAULT_CONFIG_FILE.as_bytes())?;
+    }
+    Root::from_tree_file(&format!("{}/.btel/config.tr",env!("HOME")))
+}
+#[cfg(target_os = "windows")]
+fn btel_init() -> Result<Root<String>,std::io::Error>{
+    if !std::path::Path::new(&format!("{}/btel",env!("AppData"))).exists() {
+        let _ = std::fs::create_dir(format!("{}/btel",env!("AppData")));
+        let mut extern_modes = File::create_new(format!("{}/btel/config.tr",env!("AppData")))?;
+        extern_modes.write_all(DEFAULT_CONFIG_FILE.as_bytes())?;
+    }
+    Root::from_tree_file(&format!("{}/btel/config.tr",env!("AppData")))
+}
+fn run(terminal:&mut Terminal<CrosstermBackend<io::Stdout>>,config_tree: &mut Root<String>) -> Result<(),Error>{
     let args: Vec<String> = std::env::args().collect();
     let mut input: Vec<String> = vec![String::new()];
     let mut output: String = String::new();
@@ -49,11 +62,9 @@ fn run(terminal:&mut Terminal<CrosstermBackend<io::Stdout>>) -> Result<(),Error>
     let mut scroll_y:usize = 0;
     let mut scroll_x:usize = 0;
     let mut display = Display::Help;
-    let commands = fs::read_to_string(format!("{}/.btel/command.txt",env!("HOME"))).expect("command.txt not found at ~/.btel/command.txt");
-    let commands: Vec<Extern> = load_commands(commands);
+    let commands: Vec<Extern> = load_commands(config_tree)?;
     if args.len() == 2 {display = Display::Input;exc_command(&mut format!("o {}", args[1]),&mut output,&mut mode,&mut display,&mut input,&mut saved,&mut file_name,&mut line_name,&commands,&mut edit_cursor,&mut vert_cursor,&mut scroll_x,&mut scroll_y)}
     loop {
-        let _ =terminal.clear();
         let _ = terminal.draw(|f|render(f, App {mode: mode,input: &input,command: &command,line_name: &line_name,file_name: &file_name,output: &output,display: &display},&mut edit_cursor,&mut vert_cursor,&mut scroll_y,&mut scroll_x));
         if let Event::Key(key) = event::read().unwrap() {
             match mode {
@@ -250,13 +261,19 @@ fn exc_command(command: &mut String,output:&mut String,mode: &mut Mode,display: 
         _ => *line_name = String::from("Command not found."),
     }
 }
-fn load_commands(modefile: String) -> Vec<Extern>{
+fn load_commands(config_tree: &mut Root<String>) -> Result<Vec<Extern>,std::fmt::Error>{
     let mut result:Vec<Extern> = Vec::new();
-    for modeline in modefile.split("\n") {
-        let mut pieces: Vec<&str> = modeline.split_ascii_whitespace().collect();
-        result.push(Extern {path: pieces.pop().expect("Commandfile Error").to_string(),names: pieces.iter().map(|p|p.to_string()).collect()});
+    let mut test = String::new();
+    for root in &config_tree.get_child("commands")?.roots{
+        test += ":";
+        let names: Vec<&str> = root.name.split(" or ").collect();
+        if let tree::Val::Val(value) = &root.value {
+            result.push(Extern {path: value.to_string(),names: names.iter().map(|n|n.to_string()).collect()});
+        } else {
+            return Err(std::fmt::Error);
+        }
     }
-    result
+    Ok(result)
 }
 fn set_from_btel_vars(vars: BtelVars,input:&mut Vec<String>,output:&mut String,edit_cursor:&mut usize,vert_cursor:&mut usize,mode: &mut Mode,line_name:&mut String,file_name: &mut String,saved: &mut bool,scroll_x: &mut usize,scroll_y: &mut usize,display: &mut Display) {
     *input = vars.input;

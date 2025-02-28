@@ -1,6 +1,5 @@
 use btel::{get_btel_vars,set_btel_vars,Display};
 use std::process::Command;
-use std::fs;
 fn main() {
     let args = std::env::args().collect();
     let mut vars = get_btel_vars(args);
