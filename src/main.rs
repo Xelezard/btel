@@ -3,7 +3,7 @@ use tui::{
     backend::CrosstermBackend, layout::{Constraint, Direction, Layout}, text::{Span, Spans, Text}, widgets::{Block, Borders, Paragraph}, Frame, Terminal
 };
 use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode}, execute, terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen}
+    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind}, execute, terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen}
 };
 use btel::*;
 mod highlight;
@@ -64,55 +64,48 @@ fn run(terminal:&mut Terminal<CrosstermBackend<io::Stdout>>,config_tree: &mut Ro
     let mut display = Display::Help;
     let commands: Vec<Extern> = load_commands(config_tree)?;
     if args.len() == 2 {display = Display::Input;exc_command(&mut format!("o {}", args[1]),&mut output,&mut mode,&mut display,&mut input,&mut saved,&mut file_name,&mut line_name,&commands,&mut edit_cursor,&mut vert_cursor,&mut scroll_x,&mut scroll_y)}
-    #[cfg(target_os = "windows")]
-    let mut typed = false;
     loop {
-        #[cfg(target_os = "windows")]
-        if typed {
-            typed = false;
-            continue;
-        } else {
-            typed = true
-        }
         let _ = terminal.draw(|f|render(f, App {mode: mode,input: &input,command: &command,line_name: &line_name,file_name: &file_name,output: &output,display: &display},&mut edit_cursor,&mut vert_cursor,&mut scroll_y,&mut scroll_x));
         if let Event::Key(key) = event::read().unwrap() {
-            match mode {
-                Mode::Command => {
-                    line_name = String::from("Command");
-                    display = Display::Input;
-                    match key.code {
-                        KeyCode::Char(x) => {command += &x.to_string();},
-                        KeyCode::Backspace => {let _ = command.pop();},
-                        KeyCode::Enter => {exc_command(&mut command,&mut output,&mut mode,&mut display,&mut input,&mut saved,&mut file_name,&mut line_name,&commands,&mut edit_cursor,&mut vert_cursor,&mut scroll_x,&mut scroll_y);command = String::new();},
-                        KeyCode::Esc => {command = String::new();},
+            if key.kind == KeyEventKind::Press {
+                match mode {
+                    Mode::Command => {
+                        line_name = String::from("Command");
+                        display = Display::Input;
+                        match key.code {
+                            KeyCode::Char(x) => {command += &x.to_string();},
+                            KeyCode::Backspace => {let _ = command.pop();},
+                            KeyCode::Enter => {exc_command(&mut command,&mut output,&mut mode,&mut display,&mut input,&mut saved,&mut file_name,&mut line_name,&commands,&mut edit_cursor,&mut vert_cursor,&mut scroll_x,&mut scroll_y);command = String::new();},
+                            KeyCode::Esc => {command = String::new();},
+                            _ => ()
+                        }
+                    },
+                    Mode::Find(x,y) => {
+                        line_name = String::from("Find");
+                        match key.code {
+                            KeyCode::Char(x) => {command += &x.to_string();mode = Mode::Find(0, 0)},
+                            KeyCode::Backspace => {let _ = command.pop();mode = Mode::Find(0, 0)},
+                            KeyCode::Enter => {if let Some((x_cursor,y_cursor)) = find(&command, &input,x,y){vert_cursor = y_cursor;edit_cursor = x_cursor;mode = Mode::Find(x_cursor +1, y_cursor)} else if x == 0 && y == 0{line_name = String::from("Pattern not found")}else {mode = Mode::Find(0, 0)}}
+                            KeyCode::Esc => {command = String::new();mode = Mode::Command;line_name = String::from("Command")},
+                            _ => ()
+                        }
+                    },
+                    Mode::Edit => match key.code {
+                        KeyCode::Char(x) => {if x.is_ascii() {input[vert_cursor].insert(edit_cursor, x)/*input += &x.to_string()*/;edit_cursor += 1;saved = false}},
+                        KeyCode::Backspace => {if edit_cursor != 0 {if edit_cursor == input[vert_cursor].len() {let _ = input[vert_cursor].pop();edit_cursor -= 1} else {let _ = input[vert_cursor].remove(edit_cursor -1);edit_cursor -= 1;saved = false}}else if vert_cursor != 0{let rest = input.remove(vert_cursor);input[vert_cursor-1] += &rest;vert_cursor -= 1;edit_cursor = input[vert_cursor].len() - rest.len()} },
+                        KeyCode::Delete => {if edit_cursor != input[vert_cursor].len() {if edit_cursor + 1 == input[vert_cursor].len() {let _ = input[vert_cursor].pop();}else {let _ = input[vert_cursor].remove(edit_cursor + 1);/*edit_cursor -= 1;*/}}else if vert_cursor +1 != input.len(){let rest = input.remove(vert_cursor +1); input[vert_cursor] += &rest}saved = false},
+                        KeyCode::Enter => {let line = input[vert_cursor].split_off(edit_cursor);input.insert(vert_cursor+1,line)/*input += &"\n".to_string()*/;vert_cursor += 1;edit_cursor = 0;},
+                        KeyCode::Esc => {mode = Mode::Command;line_name = String::from("Command")},
+                        KeyCode::Left => {if edit_cursor != 0 {edit_cursor -= 1} else if vert_cursor != 0 {vert_cursor -=1;edit_cursor = input[vert_cursor].len()}},
+                        KeyCode::Right => if edit_cursor +1 <= input[vert_cursor].len() {edit_cursor  +=1}else if vert_cursor +1 != input.len(){vert_cursor +=1;edit_cursor = 0},
+                        KeyCode::Up => if vert_cursor != 0 {vert_cursor -= 1; if input[vert_cursor].len() < edit_cursor +2 {edit_cursor = input[vert_cursor].len()}},
+                        KeyCode::Down => if vert_cursor +2 <= input.len() {vert_cursor += 1; if input[vert_cursor].len() < edit_cursor +2 {edit_cursor = input[vert_cursor].len()}},
+                        KeyCode::Tab => {for _ in 0..4 {input[vert_cursor].insert(edit_cursor, ' ');}edit_cursor += 4;saved = false}
                         _ => ()
-                    }
-                },
-                Mode::Find(x,y) => {
-                    line_name = String::from("Find");
-                    match key.code {
-                        KeyCode::Char(x) => {command += &x.to_string();mode = Mode::Find(0, 0)},
-                        KeyCode::Backspace => {let _ = command.pop();mode = Mode::Find(0, 0)},
-                        KeyCode::Enter => {if let Some((x_cursor,y_cursor)) = find(&command, &input,x,y){vert_cursor = y_cursor;edit_cursor = x_cursor;mode = Mode::Find(x_cursor +1, y_cursor)} else if x == 0 && y == 0{line_name = String::from("Pattern not found")}else {mode = Mode::Find(0, 0)}}
-                        KeyCode::Esc => {command = String::new();mode = Mode::Command;line_name = String::from("Command")},
-                        _ => ()
-                    }
-                },
-                Mode::Edit => match key.code {
-                    KeyCode::Char(x) => {if x.is_ascii() {input[vert_cursor].insert(edit_cursor, x)/*input += &x.to_string()*/;edit_cursor += 1;saved = false}},
-                    KeyCode::Backspace => {if edit_cursor != 0 {if edit_cursor == input[vert_cursor].len() {let _ = input[vert_cursor].pop();edit_cursor -= 1} else {let _ = input[vert_cursor].remove(edit_cursor -1);edit_cursor -= 1;saved = false}}else if vert_cursor != 0{let rest = input.remove(vert_cursor);input[vert_cursor-1] += &rest;vert_cursor -= 1;edit_cursor = input[vert_cursor].len() - rest.len()} },
-                    KeyCode::Delete => {if edit_cursor != input[vert_cursor].len() {if edit_cursor + 1 == input[vert_cursor].len() {let _ = input[vert_cursor].pop();}else {let _ = input[vert_cursor].remove(edit_cursor + 1);/*edit_cursor -= 1;*/}}else if vert_cursor +1 != input.len(){let rest = input.remove(vert_cursor +1); input[vert_cursor] += &rest}saved = false},
-                    KeyCode::Enter => {let line = input[vert_cursor].split_off(edit_cursor);input.insert(vert_cursor+1,line)/*input += &"\n".to_string()*/;vert_cursor += 1;edit_cursor = 0;},
-                    KeyCode::Esc => {mode = Mode::Command;line_name = String::from("Command")},
-                    KeyCode::Left => {if edit_cursor != 0 {edit_cursor -= 1} else if vert_cursor != 0 {vert_cursor -=1;edit_cursor = input[vert_cursor].len()}},
-                    KeyCode::Right => if edit_cursor +1 <= input[vert_cursor].len() {edit_cursor  +=1}else if vert_cursor +1 != input.len(){vert_cursor +=1;edit_cursor = 0},
-                    KeyCode::Up => if vert_cursor != 0 {vert_cursor -= 1; if input[vert_cursor].len() < edit_cursor +2 {edit_cursor = input[vert_cursor].len()}},
-                    KeyCode::Down => if vert_cursor +2 <= input.len() {vert_cursor += 1; if input[vert_cursor].len() < edit_cursor +2 {edit_cursor = input[vert_cursor].len()}},
-                    KeyCode::Tab => {for _ in 0..4 {input[vert_cursor].insert(edit_cursor, ' ');}edit_cursor += 4;saved = false}
-                    _ => ()
-                },
-                Mode::Quit => if saved {return Ok(())} else {mode = Mode::Command;line_name = String::from("Unsaved changes use fq to quit anyway")},
-                Mode::ForceQuit => return Ok(()),
+                    },
+                    Mode::Quit => if saved {return Ok(())} else {mode = Mode::Command;line_name = String::from("Unsaved changes use fq to quit anyway")},
+                    Mode::ForceQuit => return Ok(()),
+                }
             }
         }
     }
