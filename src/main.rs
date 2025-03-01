@@ -18,7 +18,9 @@ fn main() -> Result<(), io::Error> {
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
     let mut config_tree = btel_init()?;
-    let _ = run(&mut terminal,&mut config_tree);
+    let mut history = btel_history();
+    let _ = run(&mut terminal,&mut config_tree,&mut history);
+    let _ = fs::write(&format!("{}/history",btel_path()), history.iter().rev().take(1000).rev().map(|l|l.to_string()).collect::<Vec<String>>().join("\n"));
     // restore terminal
     disable_raw_mode()?;
     execute!(
@@ -30,25 +32,20 @@ fn main() -> Result<(), io::Error> {
 
     Ok(())
 }
-#[cfg(target_os = "linux")]
+fn btel_history() -> Vec<String> {
+    let file = fs::read_to_string(&format!("{}/history",btel_path())).expect("Error loading history");
+    file.split("\n").map(|l|l.to_string()).collect()
+}
 fn btel_init() -> Result<Root<String>,std::io::Error>{
-    if !std::path::Path::new(&format!("{}/.btel",env!("HOME"))).exists() {
-        let _ = std::fs::create_dir(format!("{}/.btel",env!("HOME")));
-        let mut extern_modes = File::create_new(format!("{}/.btel/config.tr",env!("HOME")))?;
+    if !std::path::Path::new(&btel_path()).exists() {
+        let _ = std::fs::create_dir(&btel_path());
+        let _ = fs::write(&format!("{}/history",btel_path()), "");
+        let mut extern_modes = File::create_new(format!("{}/config.tr",&btel_path()))?;
         extern_modes.write_all(DEFAULT_CONFIG_FILE.as_bytes())?;
     }
-    Root::from_tree_file(&format!("{}/.btel/config.tr",env!("HOME")))
+    Root::from_tree_file(&format!("{}/config.tr",btel_path()))
 }
-#[cfg(target_os = "windows")]
-fn btel_init() -> Result<Root<String>,std::io::Error>{
-    if !std::path::Path::new(&format!("{}/btel",env!("AppData"))).exists() {
-        let _ = std::fs::create_dir(format!("{}/btel",env!("AppData")));
-        let mut extern_modes = File::create_new(format!("{}/btel/config.tr",env!("AppData")))?;
-        extern_modes.write_all(DEFAULT_CONFIG_FILE.as_bytes())?;
-    }
-    Root::from_tree_file(&format!("{}/btel/config.tr",env!("AppData")))
-}
-fn run(terminal:&mut Terminal<CrosstermBackend<io::Stdout>>,config_tree: &mut Root<String>) -> Result<(),Error>{
+fn run(terminal:&mut Terminal<CrosstermBackend<io::Stdout>>,config_tree: &mut Root<String>,history: &mut Vec<String>) -> Result<(),Error>{
     let args: Vec<String> = std::env::args().collect();
     let mut input: Vec<String> = vec![String::new()];
     let mut output: String = String::new();
@@ -62,6 +59,7 @@ fn run(terminal:&mut Terminal<CrosstermBackend<io::Stdout>>,config_tree: &mut Ro
     let mut scroll_y:usize = 0;
     let mut scroll_x:usize = 0;
     let mut display = Display::Help;
+    let mut hist_cursor: usize = 0;
     let commands: Vec<Extern> = load_commands(config_tree)?;
     if args.len() == 2 {display = Display::Input;exc_command(&mut format!("o {}", args[1]),&mut output,&mut mode,&mut display,&mut input,&mut saved,&mut file_name,&mut line_name,&commands,&mut edit_cursor,&mut vert_cursor,&mut scroll_x,&mut scroll_y)}
     loop {
@@ -75,8 +73,10 @@ fn run(terminal:&mut Terminal<CrosstermBackend<io::Stdout>>,config_tree: &mut Ro
                         match key.code {
                             KeyCode::Char(x) => {command += &x.to_string();},
                             KeyCode::Backspace => {let _ = command.pop();},
-                            KeyCode::Enter => {exc_command(&mut command,&mut output,&mut mode,&mut display,&mut input,&mut saved,&mut file_name,&mut line_name,&commands,&mut edit_cursor,&mut vert_cursor,&mut scroll_x,&mut scroll_y);command = String::new();},
+                            KeyCode::Enter => {exc_command(&mut command,&mut output,&mut mode,&mut display,&mut input,&mut saved,&mut file_name,&mut line_name,&commands,&mut edit_cursor,&mut vert_cursor,&mut scroll_x,&mut scroll_y);hist_cursor = 0;if command != String::new() {history.push(command)}command = String::new();},
                             KeyCode::Esc => {command = String::new();},
+                            KeyCode::Up => {if hist_cursor + 1 < history.len() {hist_cursor += 1;command = get_from_history(history, &hist_cursor)} else {command = String::new();hist_cursor = 0}},
+                            KeyCode::Down => {if hist_cursor > 0 {hist_cursor -= 1;command = get_from_history(history, &hist_cursor)}else {command = String::new()}},
                             _ => ()
                         }
                     },
@@ -289,4 +289,11 @@ fn set_from_btel_vars(vars: BtelVars,input:&mut Vec<String>,output:&mut String,e
     *scroll_x = vars.scroll_x;
     *scroll_y = vars.scroll_y;
     *display = vars.display;
+}
+fn get_from_history(history: &Vec<String>,hist_cursor:&usize) -> String {
+    let mut history: Vec<String> = history.iter().rev().map(|l|l.to_string()).collect();
+    history.reverse();
+    history.push(String::new());
+    history.reverse();
+    history.remove(*hist_cursor)
 }

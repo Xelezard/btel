@@ -2,7 +2,7 @@
 name = "btel"
 version = "0.1.0"
 edition = "2021"
-
+target = "x86_64-unknown-linux-gnu"
 [dependencies]
 crossterm = "0.28.1"
 regex = "1.11.1"

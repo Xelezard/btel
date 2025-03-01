@@ -105,3 +105,11 @@ fn get_args(full_args: Vec<String>) -> Option<Vec<String>> {
 pub fn set_btel_vars(vars: BtelVars) {
     println!("{}\n\t\n{}\n\t\n{}\n\t\n{}\n\t\n{:?}\n\t\n{}\n\t\n{}\n\t\n{}\n\t\n{}\n\t\n{}\n\t\n{:?}",vars.input.join("\n"),vars.output,vars.edit_cursor,vars.vert_cursor,vars.mode,vars.line_name,vars.file_name,vars.saved,vars.scroll_x,vars.scroll_y,vars.display)
 }
+#[cfg(target_os = "linux")]
+pub fn btel_path() -> String{
+    format!("{}/.btel",env!("HOME"))
+}
+#[cfg(target_os = "windows")]
+pub fn btel_path() -> String{
+    format!("{}/.btel",env!("AppData"))
+}
