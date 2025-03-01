@@ -1,6 +1,6 @@
 use std::{fmt::Error, fs::{self, File}, io::{self, Write}, process::Command};
 use tui::{
-    backend::CrosstermBackend, layout::{Constraint, Direction, Layout}, text::{Span, Spans, Text}, widgets::{Block, Borders, Paragraph}, Frame, Terminal
+    backend::CrosstermBackend, layout::{Constraint, Direction, Layout, Rect}, style::Style, text::{Span, Spans, Text}, widgets::{Block, Borders, List, ListItem, ListState, Paragraph}, Frame, Terminal
 };
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind}, execute, terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen}
@@ -61,9 +61,13 @@ fn run(terminal:&mut Terminal<CrosstermBackend<io::Stdout>>,config_tree: &mut Ro
     let mut display = Display::Help;
     let mut hist_cursor: usize = 0;
     let commands: Vec<Extern> = load_commands(config_tree)?;
-    if args.len() == 2 {display = Display::Input;exc_command(&mut format!("o {}", args[1]),&mut output,&mut mode,&mut display,&mut input,&mut saved,&mut file_name,&mut line_name,&commands,&mut edit_cursor,&mut vert_cursor,&mut scroll_x,&mut scroll_y)}
+    let mut files_in_folder: Vec<String> = Vec::new();
+    let mut opened_folder: Option<String> = None;
+    let mut targets_folder = false;
+    let mut folder_cursor: usize = 0;
+    if args.len() == 2 {display = Display::Input;exc_command(&mut format!("o {}", args[1]),&mut output,&mut mode,&mut display,&mut input,&mut saved,&mut file_name,&mut line_name,&commands,&mut edit_cursor,&mut vert_cursor,&mut scroll_x,&mut scroll_y,&mut opened_folder,&mut files_in_folder)}
     loop {
-        let _ = terminal.draw(|f|render(f, App {mode: mode,input: &input,command: &command,line_name: &line_name,file_name: &file_name,output: &output,display: &display},&mut edit_cursor,&mut vert_cursor,&mut scroll_y,&mut scroll_x));
+        let _ = terminal.draw(|f|render(f, App {mode: mode,input: &input,command: &command,line_name: &line_name,file_name: &file_name,output: &output,display: &display},&mut edit_cursor,&mut vert_cursor,&mut scroll_y,&mut scroll_x,&mut opened_folder,&files_in_folder,&targets_folder,&folder_cursor));
         if let Event::Key(key) = event::read().unwrap() {
             if key.kind == KeyEventKind::Press {
                 match mode {
@@ -73,10 +77,15 @@ fn run(terminal:&mut Terminal<CrosstermBackend<io::Stdout>>,config_tree: &mut Ro
                         match key.code {
                             KeyCode::Char(x) => {command += &x.to_string();},
                             KeyCode::Backspace => {let _ = command.pop();},
-                            KeyCode::Enter => {exc_command(&mut command,&mut output,&mut mode,&mut display,&mut input,&mut saved,&mut file_name,&mut line_name,&commands,&mut edit_cursor,&mut vert_cursor,&mut scroll_x,&mut scroll_y);hist_cursor = 0;if command != String::new() {history.push(command)}command = String::new();},
+                            KeyCode::Enter if !targets_folder => {exc_command(&mut command,&mut output,&mut mode,&mut display,&mut input,&mut saved,&mut file_name,&mut line_name,&commands,&mut edit_cursor,&mut vert_cursor,&mut scroll_x,&mut scroll_y,&mut opened_folder,&mut files_in_folder);hist_cursor = 0;if command != String::new() {history.push(command)}command = String::new();},
                             KeyCode::Esc => {command = String::new();},
-                            KeyCode::Up => {if hist_cursor + 1 < history.len() {hist_cursor += 1;command = get_from_history(history, &hist_cursor)} else {command = String::new();hist_cursor = 0}},
-                            KeyCode::Down => {if hist_cursor > 0 {hist_cursor -= 1;command = get_from_history(history, &hist_cursor)}else {command = String::new()}},
+                            KeyCode::Up if !targets_folder => {if hist_cursor + 1 < history.len() {hist_cursor += 1;command = get_from_history(history, &hist_cursor)} else {command = String::new();hist_cursor = 0}},
+                            KeyCode::Down if !targets_folder => {if hist_cursor > 0 {hist_cursor -= 1;command = get_from_history(history, &hist_cursor)}else {command = String::new()}},
+                            KeyCode::Down => {if folder_cursor + 1 < files_in_folder.len(){folder_cursor += 1} else {folder_cursor = 0}},
+                            KeyCode::Up => {if folder_cursor > 0 {folder_cursor -= 1} else {folder_cursor = files_in_folder.len() - 1}},
+                            KeyCode::Right => {if let Some(_) = opened_folder {targets_folder = false}},
+                            KeyCode::Left => {if let Some(_) = opened_folder {targets_folder = true}},
+                            KeyCode::Enter => {exc_command(&mut format!("o {}/{}", opened_folder.as_ref().unwrap(),files_in_folder[folder_cursor]),&mut output,&mut mode,&mut display,&mut input,&mut saved,&mut file_name,&mut line_name,&commands,&mut edit_cursor,&mut vert_cursor,&mut scroll_x,&mut scroll_y,&mut opened_folder,&mut files_in_folder)},
                             _ => ()
                         }
                     },
@@ -110,17 +119,43 @@ fn run(terminal:&mut Terminal<CrosstermBackend<io::Stdout>>,config_tree: &mut Ro
         }
     }
 }
-fn render(f:&mut  Frame<'_,CrosstermBackend<io::Stdout>>, app: App,edit_cursor:&mut usize,vert_cursor:&mut usize,scroll: &mut usize,scroll_x: &mut usize) {
-    let chunks = Layout::default()
-    .direction(Direction::Vertical)
-    .margin(1)
+fn render(f:&mut  Frame<'_,CrosstermBackend<io::Stdout>>, app: App,edit_cursor:&mut usize,vert_cursor:&mut usize,scroll: &mut usize,scroll_x: &mut usize,opened_folder: &mut Option<String>,files_in_folder: &Vec<String>,targets_folder: &bool,folder_cursor: &usize) {
+    let big_chunks = Layout::default()
+    .direction(Direction::Horizontal)
+    .margin(0)
     .constraints(
-    match app.mode {
-        Mode::Edit =>[Constraint::Percentage(100),Constraint::Percentage(0),].as_ref(),
-        _ => [Constraint::Percentage(70),Constraint::Percentage(30),].as_ref()
-    }
+        {
+        if let Some(_) = opened_folder {
+            if app.mode != Mode::Command {
+                [Constraint::Percentage(0),Constraint::Percentage(100)]
+            }
+            else if *targets_folder {
+                [Constraint::Max(30),Constraint::Percentage(70)]
+            } else {
+                [Constraint::Max(15),Constraint::Percentage(70)]
+            }
+        } else {
+            [Constraint::Percentage(0),Constraint::Percentage(100)]
+        }
+        }
     )
     .split(f.size());
+    let chunks = Layout::default()
+    .direction(Direction::Vertical)
+    .margin(0)
+    .constraints(
+    match app.mode {
+        Mode::Edit => {[Constraint::Percentage(100),Constraint::Percentage(0),].as_ref()},
+        _ => {[Constraint::Percentage(70),Constraint::Percentage(30),].as_ref()},
+    }
+    )
+    .split(Rect {x: big_chunks[1].x,y: big_chunks[1].y,width: big_chunks[1].width,height: big_chunks[1].height});
+    if let Some(folder) = opened_folder {
+        let folder = List::new(files_in_folder.iter().map(|f|ListItem::new(f.to_string())).collect::<Vec<ListItem>>()).highlight_symbol("> ").highlight_style(Style::default().bg(tui::style::Color::Green)).block(Block::default().borders(Borders::ALL).title(folder.to_string()));
+        let mut state = ListState::default();
+        state.select(Some(*folder_cursor));
+        f.render_stateful_widget(folder, big_chunks[0],&mut state);
+    }
     while *vert_cursor  > (*scroll + (chunks[0].height as usize) -3) {
         *scroll += 1
     }
@@ -139,6 +174,8 @@ fn render(f:&mut  Frame<'_,CrosstermBackend<io::Stdout>>, app: App,edit_cursor:&
         x if x.ends_with(".json") => highlight::json_highlight(&text),
         _ => Text::from(text)
     };
+    let input_block = Block::default().borders(Borders::ALL).title(app.file_name.to_string()).border_style(Style::default().fg(match app.mode {Mode::Edit => tui::style::Color::White, _ => tui::style::Color::DarkGray}));
+    let command_block = Block::default().borders(Borders::ALL).title(app.line_name.to_string()).border_style(Style::default().fg(match targets_folder {false => tui::style::Color::White, true => tui::style::Color::DarkGray}));
     if app.input.len() <= (*scroll + (chunks[0].height as usize)+2) {
         let on_screnn = Text::from(text_spans.lines.drain(*scroll..).as_slice().iter().map(|l|l.clone()).collect::<Vec<Spans>>());
         text_spans = on_screnn
@@ -146,19 +183,21 @@ fn render(f:&mut  Frame<'_,CrosstermBackend<io::Stdout>>, app: App,edit_cursor:&
         let on_screen = Text::from(text_spans.lines.drain(*scroll..(*scroll + (chunks[0].height as usize) -1)).as_slice().iter().map(|l|l.clone()).collect::<Vec<Spans>>());
         text_spans = on_screen
     }
-    let command = Paragraph::new(Spans::from(vec![Span::raw(app.command)])).block(Block::default().borders(Borders::ALL).title(app.line_name.as_str()));
+    let command = Paragraph::new(Spans::from(vec![Span::raw(app.command)])).block(command_block);
     if *app.display == Display::Output {
         let output = Paragraph::new(app.output.to_string()).block(Block::default().borders(Borders::ALL).title("Output"));
         f.render_widget(output,chunks[0]);    
-        f.set_cursor(chunks[0].x + 1, chunks[0].y + 1);
     } else if *app.display == Display::Input {
-        let input = Paragraph::new(text_spans).scroll((0,(*scroll_x as u16))).block(Block::default().borders(Borders::ALL).title(app.file_name.as_str()));
+        let input = Paragraph::new(text_spans).scroll((0,(*scroll_x as u16))).block(input_block);
         f.render_widget(input,chunks[0]);   
-        f.set_cursor(chunks[0].x + (*edit_cursor as u16) + 1 - (*scroll_x as u16), (*vert_cursor as u16) + chunks[0].y + 1 - (*scroll as u16));
     } else if *app.display == Display::Help {
-        let help = Paragraph::new(HELP_MESSAGE).block(Block::default().borders(Borders::ALL).title(app.file_name.as_str()));
+        let help = Paragraph::new(HELP_MESSAGE).block(input_block);
         f.render_widget(help,chunks[0]);    
-        f.set_cursor(chunks[0].x + 1, chunks[0].y + 1);
+    }
+    if app.mode == Mode::Edit {
+        f.set_cursor(chunks[0].x + (*edit_cursor as u16) + 1 - (*scroll_x as u16), (*vert_cursor as u16) + chunks[0].y + 1 - (*scroll as u16));
+    }   else {
+        f.set_cursor(chunks[1].x +1 + (app.command.len() as u16), chunks[1].y + 1);
     }
     f.render_widget(command, chunks[1]);
 }
@@ -172,6 +211,12 @@ fn open(command: &String) -> Option<Vec<String>>{
         let split:Vec<&str> = file.split("\n").collect();
         let s: Vec<String> = split.iter().map(|f|f.to_string()).collect();
         return Some(s);
+    }
+    None
+ }
+fn open_folder(command: &String) -> Option<&String>{
+    if std::path::Path::new(command).exists() {
+        return Some(command);
     }
     None
  }
@@ -204,7 +249,7 @@ fn find(command: &String,input:&Vec<String>,x:usize,y:usize) ->Option<(usize,usi
     }
     None
 }
-fn exc_command(command: &mut String,output:&mut String,mode: &mut Mode,display: &mut Display,input:&mut Vec<String>,saved: &mut bool,file_name: &mut String,line_name:&mut String,commands: &Vec<Extern>,edit_cursor:&mut usize,vert_cursor:&mut usize,scroll_x: &mut usize,scroll_y: &mut usize) {
+fn exc_command(command: &mut String,output:&mut String,mode: &mut Mode,display: &mut Display,input:&mut Vec<String>,saved: &mut bool,file_name: &mut String,line_name:&mut String,commands: &Vec<Extern>,edit_cursor:&mut usize,vert_cursor:&mut usize,scroll_x: &mut usize,scroll_y: &mut usize,opened_folder: &mut Option<String>,files_in_folder: &mut Vec<String>) {
     let mut pieces: Vec<&str> = command.split_ascii_whitespace().collect();
     if pieces.len() == 0 {
         return ();
@@ -243,14 +288,26 @@ fn exc_command(command: &mut String,output:&mut String,mode: &mut Mode,display: 
             *output = result
         },
         BtelCommand::Open if pieces.len() == 2 => {
+            if *saved {
             if let Some(file) = open(&pieces[1].to_string()) {
                 *input = file;
                 *file_name = String::from(pieces[1]);
                 *saved = true;
                 *vert_cursor = 0;
                 *edit_cursor = 0;
+            } else if let  Some(folder) = open_folder(&pieces[1].to_string()) {
+                *files_in_folder = vec![String::from("..")];
+                *opened_folder = Some(folder.to_string());
+                for result in fs::read_dir(folder).unwrap() {
+                    if let Ok(file) = result {
+                        files_in_folder.push(file.file_name().into_string().unwrap());
+                    }
+                }
             } else {
                 *line_name = String::from("File not found")
+            }
+            } else {
+                *line_name = String::from("Unsaved Changes");
             }
         },
         BtelCommand::Save => {pieces.push("");save(&pieces[1].to_string(),file_name,&input,saved);}

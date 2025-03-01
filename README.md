@@ -1,7 +1,7 @@
 # Btel Text Editor 
 > **B**ad **T**ext **E**ditor **L**ol
 
-A simple text editor hobby project written in rust
+A simple hobby project text editor written in rust
 
 ![screenshot](screenshot.png)
 ## Features
@@ -37,6 +37,10 @@ Note: each Command may have a shorter version
 "open" or "o"
 
 Used to open a file replacing the current one
+
+If you open a directory, a side drawer will open displaying all the files
+
+Now press right to be able to choose a file and accept with enter
 
 > open file.txt
 
