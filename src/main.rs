@@ -216,9 +216,24 @@ fn open(command: &String) -> Option<Vec<String>>{
     }
     None
  }
-fn open_folder(command: &String) -> Option<&String>{
-    if std::path::Path::new(command).exists() {
-        return Some(command);
+fn open_folder(command: &String) -> Option<String>{
+    if std::path::Path::new(command).is_dir() {
+        let mut new_command = command.to_string();
+        if !command.contains(std::env::current_dir().unwrap().to_str().unwrap()) && !command.starts_with("/") {
+            new_command = format!("{}/{}",std::env::current_dir().unwrap().to_str().unwrap(),command.to_string());
+        }
+        if new_command.ends_with("..") {
+            let new = new_command.split("/").collect::<Vec<&str>>().iter().rev().collect::<Vec<&&str>>().iter().skip(2).rev().map(|c|c.to_string()).collect::<Vec<String>>().join("/");
+            new_command = new;
+        } 
+        if new_command.ends_with(".") {
+            new_command.remove(new_command.len()-1);
+            new_command.remove(new_command.len()-1);
+        }
+        if new_command == String::new() {
+            return None;
+        }
+        return Some(new_command.to_owned());
     }
     None
  }
@@ -300,13 +315,14 @@ fn exc_command(command: &mut String,output:&mut String,mode: &mut Mode,display: 
                 } else if let  Some(folder) = open_folder(&pieces[1].to_string()) {
                     *files_in_folder = vec![String::from("..")];
                     *opened_folder = Some(folder.to_string());
-                    for result in fs::read_dir(folder).unwrap() {
+                    for result in fs::read_dir(&folder).expect(&folder) {
                         if let Ok(file) = result {
                             files_in_folder.push(file.file_name().into_string().unwrap());
                         }
                     }
                 } else {
-                    *line_name = String::from("File not found")
+                    *line_name = String::from("File not found");
+                    *folder_error = Some(String::from("File not found"));
                 }
             } else {
                 *line_name = String::from("Unsaved Changes");
