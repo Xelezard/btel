@@ -13,7 +13,7 @@ A simple hobby project text editor written in rust
 - Syntax highlighting for 
   - rust
   - json 
-
+  - any other language if you [configure](#configuration) it
 ## Install
 To install run:
 ```shell
@@ -99,10 +99,10 @@ Enter a command to execute it
 The config file is located at:
 
 linux -> ~/.btel/config.tr
+
 windows -> %AppData%/btel/config.tr
 
-As of now there is only one thing you can configure, plugins
-
+### Plugins
 Configure your plugins like this
 ```
 commands -> alt text
@@ -114,6 +114,32 @@ Note: you can technically have infinite commands for one plugin
 ```
 | cmd1 or cmd2 or cmd3 or cmd4 ...
 ```
+
+### Syntax highlighting
+You can configure which file extensions get highlighted with internal highlighting like this:
+```
+highlighting -> declare your syntax highlighting rules here
+| .rs -> rust
+| .json -> json
+```
+
+To configure your own highlighting use:
+```
+| .ext -> custom
+```
+You can highlight brackets like this:
+```
+|| brackets -> _start_end_
+```
+where start is the opening bracket and end the closing one
+
+And regex matches like this:
+```
+regex1 -> Green
+regex2 -> 12, 23, 4
+```
+Note: You can use either use any color from the 'tui::style::Color' enum or an rgb value that is split like this
+> r, g, b
 
 ## Plugins
 Plugins are external commands configured in the 'commands' section of the config.tr

@@ -1,3 +1,6 @@
+use regex::Regex;
+use tui::style::Color;
+
 #[derive(Clone, Copy,Debug,PartialEq)]
 pub enum Mode {
     Edit,
@@ -95,6 +98,25 @@ pub fn get_btel_vars(args:  Vec<String> ) -> BtelVars{
         display: Display::from_string(&args[11]) ,
         args: get_args(args)
     }
+}
+#[derive(Debug)]
+pub enum Highlight {
+    Cstm(CustomHighlight),
+    Incl(InclHighlight),
+    None
+}
+#[derive(Debug)]
+pub enum HighlightInstr {
+    Regex(Regex,Color),
+    Brackets(String,String),
+    None
+}
+#[derive(Debug)]
+pub struct CustomHighlight(pub Vec<HighlightInstr>);
+#[derive(Debug)]
+pub enum InclHighlight {
+    Rust,
+    Json
 }
 fn get_args(full_args: Vec<String>) -> Option<Vec<String>> {
     if full_args.len() > 11 {

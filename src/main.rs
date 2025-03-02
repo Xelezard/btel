@@ -1,6 +1,6 @@
 use std::{fmt::Error, fs::{self, File}, io::{self, Write}, process::Command};
 use tui::{
-    backend::CrosstermBackend, layout::{Constraint, Direction, Layout, Rect}, style::Style, text::{Span, Spans, Text}, widgets::{Block, Borders, List, ListItem, ListState, Paragraph}, Frame, Terminal
+    backend::CrosstermBackend, layout::{Constraint, Direction, Layout, Rect}, style::{Color, Style}, text::{Span, Spans, Text}, widgets::{Block, Borders, List, ListItem, ListState, Paragraph}, Frame, Terminal
 };
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind}, execute, terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen}
@@ -18,8 +18,9 @@ fn main() -> Result<(), io::Error> {
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
     let mut config_tree = btel_init()?;
+    let mut highlight_config: Vec<(String,Highlight)> = highlight::generate_hightlight(&mut config_tree);
     let mut history = btel_history();
-    let _ = run(&mut terminal,&mut config_tree,&mut history);
+    let _ = run(&mut terminal,&mut config_tree,&mut history,&mut highlight_config);
     let _ = fs::write(&format!("{}/history",btel_path()), history.iter().rev().take(1000).rev().map(|l|l.to_string()).collect::<Vec<String>>().join("\n"));
     // restore terminal
     disable_raw_mode()?;
@@ -45,7 +46,7 @@ fn btel_init() -> Result<Root<String>,std::io::Error>{
     }
     Root::from_tree_file(&format!("{}/config.tr",btel_path()))
 }
-fn run(terminal:&mut Terminal<CrosstermBackend<io::Stdout>>,config_tree: &mut Root<String>,history: &mut Vec<String>) -> Result<(),Error>{
+fn run(terminal:&mut Terminal<CrosstermBackend<io::Stdout>>,config_tree: &mut Root<String>,history: &mut Vec<String>,highlight_config: &mut Vec<(String,Highlight)>) -> Result<(),Error>{
     let args: Vec<String> = std::env::args().collect();
     let mut input: Vec<String> = vec![String::new()];
     let mut output: String = String::new();
@@ -68,7 +69,7 @@ fn run(terminal:&mut Terminal<CrosstermBackend<io::Stdout>>,config_tree: &mut Ro
     let mut folder_error: Option<String> = None;
     if args.len() == 2 {display = Display::Input;exc_command(&mut format!("o {}", args[1]),&mut output,&mut mode,&mut display,&mut input,&mut saved,&mut file_name,&mut line_name,&commands,&mut edit_cursor,&mut vert_cursor,&mut scroll_x,&mut scroll_y,&mut opened_folder,&mut files_in_folder,&mut folder_error)}
     loop {
-        let _ = terminal.draw(|f|render(f, App {mode: mode,input: &input,command: &command,line_name: &line_name,file_name: &file_name,output: &output,display: &display},&mut edit_cursor,&mut vert_cursor,&mut scroll_y,&mut scroll_x,&mut opened_folder,&files_in_folder,&targets_folder,&folder_cursor,&folder_error));
+        let _ = terminal.draw(|f|render(f, App {mode: mode,input: &input,command: &command,line_name: &line_name,file_name: &file_name,output: &output,display: &display},&mut edit_cursor,&mut vert_cursor,&mut scroll_y,&mut scroll_x,&mut opened_folder,&files_in_folder,&targets_folder,&folder_cursor,&folder_error,highlight_config));
         if let Event::Key(key) = event::read().unwrap() {
             if key.kind == KeyEventKind::Press {
                 folder_error = None;
@@ -121,7 +122,7 @@ fn run(terminal:&mut Terminal<CrosstermBackend<io::Stdout>>,config_tree: &mut Ro
         }
     }
 }
-fn render(f:&mut  Frame<'_,CrosstermBackend<io::Stdout>>, app: App,edit_cursor:&mut usize,vert_cursor:&mut usize,scroll: &mut usize,scroll_x: &mut usize,opened_folder: &mut Option<String>,files_in_folder: &Vec<String>,targets_folder: &bool,folder_cursor: &usize,folder_error: &Option<String>) {
+fn render(f:&mut  Frame<'_,CrosstermBackend<io::Stdout>>, app: App,edit_cursor:&mut usize,vert_cursor:&mut usize,scroll: &mut usize,scroll_x: &mut usize,opened_folder: &mut Option<String>,files_in_folder: &Vec<String>,targets_folder: &bool,folder_cursor: &usize,folder_error: &Option<String>,highlight_config: &mut Vec<(String,Highlight)>) {
     let big_chunks = Layout::default()
     .direction(Direction::Horizontal)
     .margin(0)
@@ -153,7 +154,7 @@ fn render(f:&mut  Frame<'_,CrosstermBackend<io::Stdout>>, app: App,edit_cursor:&
     )
     .split(Rect {x: big_chunks[1].x,y: big_chunks[1].y,width: big_chunks[1].width,height: big_chunks[1].height});
     if let Some(folder) = opened_folder {
-        let folder = List::new(files_in_folder.iter().map(|f|ListItem::new(f.to_string())).collect::<Vec<ListItem>>()).highlight_symbol("> ").highlight_style(Style::default().bg(tui::style::Color::Green)).block(Block::default().borders(Borders::ALL).title(if let Some(error) = folder_error{error.to_string()}else{folder.to_string()}));
+        let folder = List::new(files_in_folder.iter().map(|f|ListItem::new(f.to_string())).collect::<Vec<ListItem>>()).highlight_symbol("> ").highlight_style(Style::default().bg(tui::style::Color::Green)).block(Block::default().borders(Borders::ALL).border_style(Style::default().fg(if *targets_folder {Color::White} else {Color::DarkGray})).title(if let Some(error) = folder_error{error.to_string()}else{folder.to_string()}));
         let mut state = ListState::default();
         state.select(Some(*folder_cursor));
         f.render_stateful_widget(folder, big_chunks[0],&mut state);
@@ -171,11 +172,7 @@ fn render(f:&mut  Frame<'_,CrosstermBackend<io::Stdout>>, app: App,edit_cursor:&
         *scroll_x -= 1
     }
     let text = app.input.join("\n");
-    let mut  text_spans = match app.file_name {
-        x if x.ends_with(".rs")=> highlight::rust_highlight(&text),
-        x if x.ends_with(".json") => highlight::json_highlight(&text),
-        _ => Text::from(text)
-    };
+    let mut  text_spans = highlight::highlight(&text, highlight_config, app.file_name);
     let input_block = Block::default().borders(Borders::ALL).title(app.file_name.to_string()).border_style(Style::default().fg(match app.mode {Mode::Edit => tui::style::Color::White, _ => tui::style::Color::DarkGray}));
     let command_block = Block::default().borders(Borders::ALL).title(app.line_name.to_string()).border_style(Style::default().fg(match targets_folder {false => tui::style::Color::White, true => tui::style::Color::DarkGray}));
     if app.input.len() <= (*scroll + (chunks[0].height as usize)+2) {

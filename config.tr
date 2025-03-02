@@ -1,2 +1,9 @@
-commands -> alt text
+commands -> declare your plugin commands here
 #| cmd1 or cmd2 -> path/to/plugin
+highlighting -> declare your syntax highlighting rules here
+| .rs -> rust
+| .json -> json
+#| .ext -> custom
+#|| [a-z]*\"[^(\\*\")]*\" -> Green
+#|| \d -> 223, 123, 123
+#|| bracket -> _(_)_
