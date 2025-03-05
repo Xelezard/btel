@@ -1,6 +1,6 @@
 use btel::{CustomHighlight, Highlight, HighlightInstr, InclHighlight};
 use regex::Regex;
-use tui::{style::{Modifier, Style}, text::{Span, Spans,Text}};
+use tui::{style::{Modifier, Style}, text::{Span, Spans,Text}, widgets::BorderType};
 use tui::style::Color;
 use tree::Root;
 const  BRACKET_COLOR: [Color;3] = [Color::Yellow,Color::Rgb(255, 123, 207),Color::Rgb(73, 22, 255)];
@@ -128,7 +128,7 @@ fn generate_custom(root: &mut Root<String>) -> Highlight {
     }
     Highlight::Cstm(CustomHighlight(rules))
 }
-fn color_from_string(color: &String) -> Color {
+pub fn color_from_string(color: &String) -> Color {
     match color.as_str() {
         "Black" => Color::Black,
         "DarkGray" => Color::DarkGray,
@@ -148,6 +148,18 @@ fn color_from_string(color: &String) -> Color {
         x if matches!(rgb_from_string(x),Some(_)) => rgb_from_string(x).unwrap(),
         _ => Color::White
     }
+}
+pub fn border_type_from_string(border_type: Result<&mut Root<String>,std::fmt::Error>) -> BorderType {
+    if let Ok(b_type) = border_type  {
+        return match b_type.get_value().unwrap().as_str() {
+            "Double" => BorderType::Double,
+            "Rounded" => BorderType::Rounded,
+            "Thick" => BorderType::Thick,
+            _ => BorderType::Plain
+        }   
+    };
+    BorderType::Plain
+
 }
 fn rgb_from_string(string:&str) -> Option<Color>{
     let re = Regex::new(r"(\d+), (\d+), (\d+)").unwrap();

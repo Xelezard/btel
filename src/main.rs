@@ -1,11 +1,12 @@
 use std::{fmt::Error, fs::{self, File}, io::{self, Write}, process::Command};
 use tui::{
-    backend::CrosstermBackend, layout::{Constraint, Direction, Layout, Rect}, style::{Color, Style}, text::{Span, Spans, Text}, widgets::{Block, Borders, List, ListItem, ListState, Paragraph}, Frame, Terminal
+    backend::CrosstermBackend, layout::{Constraint, Direction, Layout, Rect}, style::{Color, Modifier, Style}, text::{Span, Spans, Text}, widgets::{Block, Borders, List, ListItem, ListState, Paragraph}, Frame, Terminal
 };
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind}, execute, terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen}
 };
 use btel::*;
+use tui::widgets::BorderType;
 mod highlight;
 use tree::Root;
 const HELP_MESSAGE: &str = include_str!("../HELP.msg");
@@ -15,12 +16,20 @@ fn main() -> Result<(), io::Error> {
     enable_raw_mode()?;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+    let mut themes = vec![
+        /*classic*/ Theme {border_type: BorderType::Plain,target: Color::White,no_target: Color::DarkGray},
+        /*modern*/ Theme { border_type: BorderType::Rounded,target: Color::White,no_target: Color::Gray},
+        /*clear*/ Theme { border_type: BorderType::Plain,target: Color::DarkGray,no_target: Color::Black},
+        /*red-and-blue*/ Theme { border_type: BorderType::Rounded,target: Color::Red,no_target: Color::LightBlue},
+        /*green*/ Theme { border_type: BorderType::Rounded,target: Color::Green,no_target: Color::LightGreen},
+        ];
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
     let mut config_tree = btel_init()?;
     let mut highlight_config: Vec<(String,Highlight)> = highlight::generate_hightlight(&mut config_tree);
     let mut history = btel_history();
-    let _ = run(&mut terminal,&mut config_tree,&mut history,&mut highlight_config);
+    let theme = theme(&mut config_tree, &mut themes);
+    let _ = run(&mut terminal,&mut config_tree,&mut history,&mut highlight_config,&theme);
     let _ = fs::write(&format!("{}/history",btel_path()), history.iter().rev().take(1000).rev().map(|l|l.to_string()).collect::<Vec<String>>().join("\n"));
     // restore terminal
     disable_raw_mode()?;
@@ -32,6 +41,22 @@ fn main() -> Result<(), io::Error> {
     terminal.show_cursor()?;
 
     Ok(())
+}
+fn theme(config_tree: &mut Root<String>,themes: &mut Vec<Theme>) -> Theme{
+    if let Ok(root) = config_tree.get_child("theme") {
+        return match root.get_value().unwrap().as_str() {
+            "modern" => themes.remove(1),
+            "clear" => themes.remove(2),
+            "red-and-blue" => themes.remove(3),
+            "green" => themes.remove(4),
+            "custom" => custom_theme(config_tree.get_child("theme").unwrap()),
+            _ => themes.remove(0)
+        };
+    }
+    themes.remove(0)
+}
+fn custom_theme(conf: &mut Root<String>) -> Theme{
+    Theme {border_type: highlight::border_type_from_string(conf.get_child("border_type")),target: {if let Ok(child) = conf.get_child("target"){highlight::color_from_string(child.get_value().unwrap())} else {Color::White}}, no_target: {if let Ok(child) = conf.get_child("no_target"){highlight::color_from_string(child.get_value().unwrap())} else {Color::White}}}
 }
 fn btel_history() -> Vec<String> {
     let file = fs::read_to_string(&format!("{}/history",btel_path())).expect("Error loading history");
@@ -46,7 +71,7 @@ fn btel_init() -> Result<Root<String>,std::io::Error>{
     }
     Root::from_tree_file(&format!("{}/config.tr",btel_path()))
 }
-fn run(terminal:&mut Terminal<CrosstermBackend<io::Stdout>>,config_tree: &mut Root<String>,history: &mut Vec<String>,highlight_config: &mut Vec<(String,Highlight)>) -> Result<(),Error>{
+fn run(terminal:&mut Terminal<CrosstermBackend<io::Stdout>>,config_tree: &mut Root<String>,history: &mut Vec<String>,highlight_config: &mut Vec<(String,Highlight)>,them: &Theme) -> Result<(),Error>{
     let args: Vec<String> = std::env::args().collect();
     let mut input: Vec<String> = vec![String::new()];
     let mut output: String = String::new();
@@ -69,7 +94,7 @@ fn run(terminal:&mut Terminal<CrosstermBackend<io::Stdout>>,config_tree: &mut Ro
     let mut folder_error: Option<String> = None;
     if args.len() == 2 {display = Display::Input;exc_command(&mut format!("o {}", args[1]),&mut output,&mut mode,&mut display,&mut input,&mut saved,&mut file_name,&mut line_name,&commands,&mut edit_cursor,&mut vert_cursor,&mut scroll_x,&mut scroll_y,&mut opened_folder,&mut files_in_folder,&mut folder_error)}
     loop {
-        let _ = terminal.draw(|f|render(f, App {mode: mode,input: &input,command: &command,line_name: &line_name,file_name: &file_name,output: &output,display: &display},&mut edit_cursor,&mut vert_cursor,&mut scroll_y,&mut scroll_x,&mut opened_folder,&files_in_folder,&targets_folder,&folder_cursor,&folder_error,highlight_config));
+        let _ = terminal.draw(|f|render(f, App {mode: mode,input: &input,command: &command,line_name: &line_name,file_name: &file_name,output: &output,display: &display},&mut edit_cursor,&mut vert_cursor,&mut scroll_y,&mut scroll_x,&mut opened_folder,&files_in_folder,&targets_folder,&folder_cursor,&folder_error,highlight_config,them));
         if let Event::Key(key) = event::read().unwrap() {
             if key.kind == KeyEventKind::Press {
                 folder_error = None;
@@ -122,7 +147,7 @@ fn run(terminal:&mut Terminal<CrosstermBackend<io::Stdout>>,config_tree: &mut Ro
         }
     }
 }
-fn render(f:&mut  Frame<'_,CrosstermBackend<io::Stdout>>, app: App,edit_cursor:&mut usize,vert_cursor:&mut usize,scroll: &mut usize,scroll_x: &mut usize,opened_folder: &mut Option<String>,files_in_folder: &Vec<String>,targets_folder: &bool,folder_cursor: &usize,folder_error: &Option<String>,highlight_config: &mut Vec<(String,Highlight)>) {
+fn render(f:&mut  Frame<'_,CrosstermBackend<io::Stdout>>, app: App,edit_cursor:&mut usize,vert_cursor:&mut usize,scroll: &mut usize,scroll_x: &mut usize,opened_folder: &mut Option<String>,files_in_folder: &Vec<String>,targets_folder: &bool,folder_cursor: &usize,folder_error: &Option<String>,highlight_config: &mut Vec<(String,Highlight)>,theme: &Theme) {
     let big_chunks = Layout::default()
     .direction(Direction::Horizontal)
     .margin(0)
@@ -154,7 +179,7 @@ fn render(f:&mut  Frame<'_,CrosstermBackend<io::Stdout>>, app: App,edit_cursor:&
     )
     .split(Rect {x: big_chunks[1].x,y: big_chunks[1].y,width: big_chunks[1].width,height: big_chunks[1].height});
     if let Some(folder) = opened_folder {
-        let folder = List::new(files_in_folder.iter().map(|f|ListItem::new(f.to_string())).collect::<Vec<ListItem>>()).highlight_symbol("> ").highlight_style(Style::default().bg(tui::style::Color::Green)).block(Block::default().borders(Borders::ALL).border_style(Style::default().fg(if *targets_folder {Color::White} else {Color::DarkGray})).title(if let Some(error) = folder_error{error.to_string()}else{folder.to_string()}));
+        let folder = List::new(files_in_folder.iter().map(|f|ListItem::new(f.to_string())).collect::<Vec<ListItem>>()).highlight_symbol("> ").highlight_style(Style::default().bg(tui::style::Color::Green)).block(Block::default().borders(Borders::ALL).border_type(theme.border_type).border_style(if *targets_folder {Style::default().fg(theme.target)} else {Style::default().fg(theme.no_target).add_modifier(Modifier::DIM)}).title(if let Some(error) = folder_error{error.to_string()}else{folder.to_string()}));
         let mut state = ListState::default();
         state.select(Some(*folder_cursor));
         f.render_stateful_widget(folder, big_chunks[0],&mut state);
@@ -173,8 +198,8 @@ fn render(f:&mut  Frame<'_,CrosstermBackend<io::Stdout>>, app: App,edit_cursor:&
     }
     let text = app.input.join("\n");
     let mut  text_spans = highlight::highlight(&text, highlight_config, app.file_name);
-    let input_block = Block::default().borders(Borders::ALL).title(app.file_name.to_string()).border_style(Style::default().fg(match app.mode {Mode::Edit => tui::style::Color::White, _ => tui::style::Color::DarkGray}));
-    let command_block = Block::default().borders(Borders::ALL).title(app.line_name.to_string()).border_style(Style::default().fg(match targets_folder {false => tui::style::Color::White, true => tui::style::Color::DarkGray}));
+    let input_block = Block::default().borders(Borders::ALL).border_type(theme.border_type).title(app.file_name.to_string()).border_style(match app.mode {Mode::Edit => Style::default().fg(theme.target), _ => Style::default().fg(theme.no_target).add_modifier(Modifier::DIM)});
+    let command_block = Block::default().borders(Borders::ALL).border_type(theme.border_type).title(app.line_name.to_string()).border_style(match targets_folder {false => Style::default().fg(theme.target), true => Style::default().fg(theme.no_target).add_modifier(Modifier::DIM)});
     if app.input.len() <= (*scroll + (chunks[0].height as usize)+2) {
         let on_screnn = Text::from(text_spans.lines.drain(*scroll..).as_slice().iter().map(|l|l.clone()).collect::<Vec<Spans>>());
         text_spans = on_screnn
@@ -184,7 +209,7 @@ fn render(f:&mut  Frame<'_,CrosstermBackend<io::Stdout>>, app: App,edit_cursor:&
     }
     let command = Paragraph::new(Spans::from(vec![Span::raw(app.command)])).block(command_block);
     if *app.display == Display::Output {
-        let output = Paragraph::new(app.output.to_string()).block(Block::default().borders(Borders::ALL).title("Output"));
+        let output = Paragraph::new(app.output.to_string()).block(Block::default().borders(Borders::ALL).border_type(theme.border_type).title("Output").border_style(Style::default().fg(theme.target)));
         f.render_widget(output,chunks[0]);    
     } else if *app.display == Display::Input {
         let input = Paragraph::new(text_spans).scroll((0,(*scroll_x as u16))).block(input_block);

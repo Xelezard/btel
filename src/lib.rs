@@ -1,5 +1,5 @@
 use regex::Regex;
-use tui::style::Color;
+use tui::{style::Color, widgets::BorderType};
 
 #[derive(Clone, Copy,Debug,PartialEq)]
 pub enum Mode {
@@ -104,6 +104,12 @@ pub enum Highlight {
     Cstm(CustomHighlight),
     Incl(InclHighlight),
     None
+}
+#[derive(Clone, Copy)]
+pub struct Theme {
+    pub border_type: BorderType,
+    pub target: Color,
+    pub no_target: Color
 }
 #[derive(Debug)]
 pub enum HighlightInstr {

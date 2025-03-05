@@ -7,3 +7,8 @@ highlighting -> declare your syntax highlighting rules here
 #|| [a-z]*\"[^(\\*\")]*\" -> Green
 #|| \d -> 223, 123, 123
 #|| bracket -> _(_)_
+theme -> classic
+# theme -> custom
+#| border_type -> Rounded
+#| target -> Yellow
+#| no_target -> LightYellow

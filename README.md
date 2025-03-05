@@ -114,7 +114,30 @@ Note: you can technically have infinite commands for one plugin
 ```
 | cmd1 or cmd2 or cmd3 or cmd4 ...
 ```
+### Themes
+You configure which theme to use like this:
+```
+theme -> classic
+#or
+theme -> modern
+#or
+theme -> clear
+#or 
+theme -> red-and-blue
+#or 
+theme -> green
+``` 
+or configure a custom one like this:
+```
+# a recreation of the 'green' theme
+theme -> custom
+| border_type -> Rounded
+| target -> Green
+| no_target -> LightGreen
+```
+where target and no_target are the colors for blocks when being targeted or not
 
+any border type from the '' enum can be used for border_type 
 ### Syntax highlighting
 You can configure which file extensions get highlighted with internal highlighting like this:
 ```
@@ -146,8 +169,6 @@ Plugins are external commands configured in the 'commands' section of the config
 
 A test plugin is located at [test_plugin/](test_plugin/)
 
-Note: currently there is no way to automatically generate the 'command.txt'
-so it must be configured manually
 ### Writing plugins
 To write a plugin first of all import btel
 
