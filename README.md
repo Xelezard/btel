@@ -64,6 +64,13 @@ Used to execute a shell command **temporarily** replacing the text field
 
 > command echo Hello World
 
+#### Force Save
+"force save" or "fs"
+
+Used to force the saved state (Open and quit think there are no unsaved changes)
+
+> force save
+
 #### Help
 "help" or "h"
 
@@ -85,9 +92,6 @@ In this mode you can write to the file.
 
 #### Quit mode -- 'q' or 'quit'
 Press any key to exit Btel if all changes are saved.
-
-#### Force Quit mode -- 'fq' or 'force quit'
-Press any key to exit Btel and not save anything.
 
 #### Find mode -- 'f' or 'find'
 Enter your pattern and hit enter to move the cursor to the next finding.

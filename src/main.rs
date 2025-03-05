@@ -141,7 +141,6 @@ fn run(terminal:&mut Terminal<CrosstermBackend<io::Stdout>>,config_tree: &mut Ro
                         _ => ()
                     },
                     Mode::Quit => if saved {return Ok(())} else {mode = Mode::Command;line_name = String::from("Unsaved changes use fq to quit anyway")},
-                    Mode::ForceQuit => return Ok(()),
                 }
             }
         }
@@ -300,7 +299,7 @@ fn exc_command(command: &mut String,output:&mut String,mode: &mut Mode,display: 
         "s" | "save" => {BtelCommand::Save},
         "c" | "command" => {BtelCommand::Command},
         "f" | "find" => {BtelCommand::Find},
-        "fq" | "force quit" => {BtelCommand::ForceQuit},
+        "fs" | "force save" => {BtelCommand::ForceSave},
         "h" | "help" => {BtelCommand::Help},
         x if (commands.iter().map(|c|c.names.clone()).collect::<Vec<Vec<String>>>().concat()).contains(&x.to_string()) => {BtelCommand::Extern(String::from(x))}
         _ => {BtelCommand::Error}
@@ -353,7 +352,7 @@ fn exc_command(command: &mut String,output:&mut String,mode: &mut Mode,display: 
         },
         BtelCommand::Save => {pieces.push("");save(&pieces[1].to_string(),file_name,&input,saved);}
         BtelCommand::Edit => {*mode = Mode::Edit},
-        BtelCommand::ForceQuit => {*mode = Mode::ForceQuit},
+        BtelCommand::ForceSave => {*saved = true},
         BtelCommand::Quit => {*mode = Mode::Quit},
         BtelCommand::Find => {*mode = Mode::Find(0, 0)}      
         BtelCommand::Help => {*display = Display::Help}

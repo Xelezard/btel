@@ -5,7 +5,6 @@ use tui::{style::Color, widgets::BorderType};
 pub enum Mode {
     Edit,
     Quit,
-    ForceQuit,
     Find(usize,usize),
     Command
 }
@@ -14,7 +13,6 @@ impl Mode {
         match string.as_str() {
             "Edit"  => Mode::Edit,
             "Quit" => Mode::Quit,
-            "ForceQuit" => Mode::ForceQuit,
             "Find" => Mode::Find(0, 0),
             "Command" => Mode::Command,
             _ => panic!("")
@@ -42,7 +40,7 @@ pub enum BtelCommand {
     Edit,
     Error,
     Quit,
-    ForceQuit,
+    ForceSave,
     Find,
     Command,
     Open,
