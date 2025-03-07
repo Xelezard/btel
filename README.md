@@ -141,7 +141,7 @@ theme -> custom
 ```
 where target and no_target are the colors for blocks when being targeted or not
 
-any border type from the '' enum can be used for border_type 
+any border type from the 'tui::widgets::BorderType' enum can be used for border_type 
 ### Syntax highlighting
 You can configure which file extensions get highlighted with internal highlighting like this:
 ```
