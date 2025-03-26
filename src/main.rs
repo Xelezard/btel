@@ -1,6 +1,6 @@
-use std::{fmt::Error, fs::{self, File}, io::{self, Write}, process::Command};
+use std::{env, fmt::Error, fs::{self, File}, io::{self, Write}, path::PathBuf, process::Command};
 use tui::{
-    backend::CrosstermBackend, layout::{Constraint, Direction, Layout, Rect}, style::{Color, Modifier, Style}, text::{Span, Spans, Text}, widgets::{Block, Borders, List, ListItem, ListState, Paragraph}, Frame, Terminal
+    backend::CrosstermBackend, layout::{Constraint, Direction, Layout, Rect}, style::{Color, Modifier, Style}, text::{Span, Spans, Text}, widgets::{Block, Borders ,List, ListItem, ListState, Paragraph, Tabs}, Frame, Terminal
 };
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind}, execute, terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen}
@@ -94,7 +94,7 @@ fn run(terminal:&mut Terminal<CrosstermBackend<io::Stdout>>,config_tree: &mut Ro
     let mut folder_error: Option<String> = None;
     if args.len() == 2 {display = Display::Input;exc_command(&mut format!("o {}", args[1]),&mut output,&mut mode,&mut display,&mut input,&mut saved,&mut file_name,&mut line_name,&commands,&mut edit_cursor,&mut vert_cursor,&mut scroll_x,&mut scroll_y,&mut opened_folder,&mut files_in_folder,&mut folder_error)}
     loop {
-        let _ = terminal.draw(|f|render(f, App {mode: mode,input: &input,command: &command,line_name: &line_name,file_name: &file_name,output: &output,display: &display},&mut edit_cursor,&mut vert_cursor,&mut scroll_y,&mut scroll_x,&mut opened_folder,&files_in_folder,&targets_folder,&folder_cursor,&folder_error,highlight_config,them));
+        let _ = terminal.draw(|f|render(f, App {mode: mode,input: &input,command: &command,line_name: &line_name,file_name: &file_name,output: &output,display: &display},&mut edit_cursor,&mut vert_cursor,&mut scroll_y,&mut scroll_x,&mut opened_folder,&files_in_folder,&targets_folder,&folder_cursor,&folder_error,highlight_config,them,config_tree));
         if let Event::Key(key) = event::read().unwrap() {
             if key.kind == KeyEventKind::Press {
                 folder_error = None;
@@ -140,13 +140,13 @@ fn run(terminal:&mut Terminal<CrosstermBackend<io::Stdout>>,config_tree: &mut Ro
                         KeyCode::Tab => {for _ in 0..4 {input[vert_cursor].insert(edit_cursor, ' ');}edit_cursor += 4;saved = false}
                         _ => ()
                     },
-                    Mode::Quit => if saved {return Ok(())} else {mode = Mode::Command;line_name = String::from("Unsaved changes use fq to quit anyway")},
+                    Mode::Quit => if saved {return Ok(())} else {mode = Mode::Command;line_name = String::from("Unsaved changes use fs to force the saved state")},
                 }
             }
         }
     }
 }
-fn render(f:&mut  Frame<'_,CrosstermBackend<io::Stdout>>, app: App,edit_cursor:&mut usize,vert_cursor:&mut usize,scroll: &mut usize,scroll_x: &mut usize,opened_folder: &mut Option<String>,files_in_folder: &Vec<String>,targets_folder: &bool,folder_cursor: &usize,folder_error: &Option<String>,highlight_config: &mut Vec<(String,Highlight)>,theme: &Theme) {
+fn render(f:&mut  Frame<'_,CrosstermBackend<io::Stdout>>, app: App,edit_cursor:&mut usize,vert_cursor:&mut usize,scroll: &mut usize,scroll_x: &mut usize,opened_folder: &mut Option<String>,files_in_folder: &Vec<String>,targets_folder: &bool,folder_cursor: &usize,folder_error: &Option<String>,highlight_config: &mut Vec<(String,Highlight)>,theme: &Theme,config_tree: &mut Root<String>) {
     let big_chunks = Layout::default()
     .direction(Direction::Horizontal)
     .margin(0)
@@ -172,8 +172,8 @@ fn render(f:&mut  Frame<'_,CrosstermBackend<io::Stdout>>, app: App,edit_cursor:&
     .margin(0)
     .constraints(
     match app.mode {
-        Mode::Edit => {[Constraint::Percentage(100),Constraint::Percentage(0),].as_ref()},
-        _ => {[Constraint::Percentage(70),Constraint::Percentage(30),].as_ref()},
+        Mode::Edit => {[Constraint::Min(4),Constraint::Length(3),Constraint::Percentage(0)].as_ref()},
+        _ => {[Constraint::Min(4),Constraint::Length(3),Constraint::Length(3),].as_ref()},
     }
     )
     .split(Rect {x: big_chunks[1].x,y: big_chunks[1].y,width: big_chunks[1].width,height: big_chunks[1].height});
@@ -196,6 +196,7 @@ fn render(f:&mut  Frame<'_,CrosstermBackend<io::Stdout>>, app: App,edit_cursor:&
         *scroll_x -= 1
     }
     let text = app.input.join("\n");
+    let status_bar = gen_stat(&app,theme,vert_cursor,edit_cursor,config_tree.get_child("stat-bar").unwrap_or(&mut Root::new("stat-bar", String::from("standard"))));
     let mut  text_spans = highlight::highlight(&text, highlight_config, app.file_name);
     let input_block = Block::default().borders(Borders::ALL).border_type(theme.border_type).title(app.file_name.to_string()).border_style(match app.mode {Mode::Edit => Style::default().fg(theme.target), _ => Style::default().fg(theme.no_target).add_modifier(Modifier::DIM)});
     let command_block = Block::default().borders(Borders::ALL).border_type(theme.border_type).title(app.line_name.to_string()).border_style(match targets_folder {false => Style::default().fg(theme.target), true => Style::default().fg(theme.no_target).add_modifier(Modifier::DIM)});
@@ -220,11 +221,13 @@ fn render(f:&mut  Frame<'_,CrosstermBackend<io::Stdout>>, app: App,edit_cursor:&
     if app.mode == Mode::Edit {
         f.set_cursor(chunks[0].x + (*edit_cursor as u16) + 1 - (*scroll_x as u16), (*vert_cursor as u16) + chunks[0].y + 1 - (*scroll as u16));
     }   else {
-        f.set_cursor(chunks[1].x +1 + (app.command.len() as u16), chunks[1].y + 1);
+        f.set_cursor(chunks[2].x +1 + (app.command.len() as u16), chunks[2].y + 1);
     }
-    f.render_widget(command, chunks[1]);
+    f.render_widget(command, chunks[2]);
+    f.render_widget(status_bar, chunks[1]);
 }
 fn open(command: &String) -> Option<Vec<String>>{
+    let command = command.replace("~", &format!("{}",env!("HOME")));
     let file_option =fs::read_to_string(command);
     if let Ok(file) = file_option {
         if !file.is_ascii() {
@@ -238,7 +241,8 @@ fn open(command: &String) -> Option<Vec<String>>{
     None
  }
 fn open_folder(command: &String) -> Option<String>{
-    if std::path::Path::new(command).is_dir() {
+    let command = command.replace("~", &format!("{}",env!("HOME")));
+    if std::path::Path::new(&command).is_dir() {
         let mut new_command = command.to_string();
         if !command.contains(std::env::current_dir().unwrap().to_str().unwrap()) && !command.starts_with("/") {
             new_command = format!("{}/{}",std::env::current_dir().unwrap().to_str().unwrap(),command.to_string());
@@ -393,4 +397,17 @@ fn get_from_history(history: &Vec<String>,hist_cursor:&usize) -> String {
     history.push(String::new());
     history.reverse();
     history.remove(*hist_cursor)
+}
+fn gen_stat(app: &App,theme: &Theme,vert_cursor:&usize,edit_cursor:&usize,conf: &mut Root<String>) -> Tabs<'static> {
+    let mut bar: Vec<Spans> = Vec::new();
+    match conf.get_value().unwrap().as_str() {
+        "standard" => bar.append(&mut vec![Spans::from(vec![Span::styled("Line: ", Style::default().fg(theme.no_target)),Span::styled(vert_cursor.to_string(), Style::default().fg(theme.target)),Span::styled(", Col: ", Style::default().fg(theme.no_target)),Span::styled(edit_cursor.to_string(), Style::default().fg(theme.target))]),Spans::from(vec![Span::styled("Mode: ", Style::default().fg(theme.no_target)),Span::styled(format!("{}",app.mode), Style::default().fg(theme.target))]),Spans::from(vec![Span::styled("Dir: ",Style::default().fg(theme.no_target)),Span::styled(env::current_dir().unwrap_or(PathBuf::new()).display().to_string(), Style::default().fg(theme.target))])]),
+        _ => (),
+    }
+    if bar.len() == 0 {
+        bar.push(
+            Spans::from(Span::styled("-",Style::default().fg(theme.no_target)))
+        );
+    }
+    tui::widgets::Tabs::new(bar).block(Block::default().borders(Borders::ALL).border_style(Style::default().fg(theme.no_target)))
 }

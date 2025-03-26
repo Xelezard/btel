@@ -1,3 +1,5 @@
+use std::fmt;
+
 use regex::Regex;
 use tui::{style::Color, widgets::BorderType};
 
@@ -17,6 +19,16 @@ impl Mode {
             "Command" => Mode::Command,
             _ => panic!("")
         }
+    }
+}
+impl fmt::Display for Mode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f,"{}",match self {
+            Mode::Edit => "Edit",
+            Mode::Command => "Command",
+            Mode::Find(_, _) => "Find",
+            Mode::Quit => "Quit"
+        })
     }
 }
 #[derive(Clone, Copy,Debug,PartialEq)]

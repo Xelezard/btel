@@ -12,3 +12,4 @@ theme -> classic
 #| border_type -> Rounded
 #| target -> Yellow
 #| no_target -> LightYellow
+stat-bar -> standard
