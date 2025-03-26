@@ -14,6 +14,8 @@ A simple hobby project text editor written in rust
   - rust
   - json 
   - any other language if you [configure](#configuration) it
+- Status Bar
+
 ## Install
 To install run:
 ```shell
@@ -167,6 +169,26 @@ regex2 -> 12, 23, 4
 ```
 Note: You can use either use any color from the 'tui::style::Color' enum or an rgb value that is split like this
 > r, g, b
+
+### Status Bar
+You can choose one of this for your status bar
+```
+# in config.tr
+
+stat-bar -> clear
+# or
+stat-bar -> standard
+# or
+stat-bar -> custom
+| 1 -> pos
+| 2 -> mode
+| 3 -> dir
+```
+Note: the numbers used in the custom declaration actually don't matter
+Note: for the custom declaration you can use one of these three options
+- pos (Line: 0, Col: 2)
+- mode (Mode: Edit)
+- dir (Dir: your/working/dir)
 
 ## Plugins
 Plugins are external commands configured in the 'commands' section of the config.tr

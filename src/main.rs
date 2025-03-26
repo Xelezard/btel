@@ -1,4 +1,4 @@
-use std::{env, fmt::Error, fs::{self, File}, io::{self, Write}, path::PathBuf, process::Command};
+use std::{env, fmt::Error, fs::{self, File}, io::{self, Write}, path::PathBuf, process::Command, vec};
 use tui::{
     backend::CrosstermBackend, layout::{Constraint, Direction, Layout, Rect}, style::{Color, Modifier, Style}, text::{Span, Spans, Text}, widgets::{Block, Borders ,List, ListItem, ListState, Paragraph, Tabs}, Frame, Terminal
 };
@@ -196,7 +196,8 @@ fn render(f:&mut  Frame<'_,CrosstermBackend<io::Stdout>>, app: App,edit_cursor:&
         *scroll_x -= 1
     }
     let text = app.input.join("\n");
-    let status_bar = gen_stat(&app,theme,vert_cursor,edit_cursor,config_tree.get_child("stat-bar").unwrap_or(&mut Root::new("stat-bar", String::from("standard"))));
+    let mut standard_stat = Root::new("stat-bar", String::from("standard"));
+    let status_bar = gen_stat(&app,theme,vert_cursor,edit_cursor,config_tree.get_child("stat-bar").unwrap_or(&mut standard_stat));
     let mut  text_spans = highlight::highlight(&text, highlight_config, app.file_name);
     let input_block = Block::default().borders(Borders::ALL).border_type(theme.border_type).title(app.file_name.to_string()).border_style(match app.mode {Mode::Edit => Style::default().fg(theme.target), _ => Style::default().fg(theme.no_target).add_modifier(Modifier::DIM)});
     let command_block = Block::default().borders(Borders::ALL).border_type(theme.border_type).title(app.line_name.to_string()).border_style(match targets_folder {false => Style::default().fg(theme.target), true => Style::default().fg(theme.no_target).add_modifier(Modifier::DIM)});
@@ -398,10 +399,11 @@ fn get_from_history(history: &Vec<String>,hist_cursor:&usize) -> String {
     history.reverse();
     history.remove(*hist_cursor)
 }
-fn gen_stat(app: &App,theme: &Theme,vert_cursor:&usize,edit_cursor:&usize,conf: &mut Root<String>) -> Tabs<'static> {
+fn gen_stat<'a>(app: &App,theme: &Theme,vert_cursor:&usize,edit_cursor:&usize,conf: &'a mut Root<String>) -> Tabs<'a> {
     let mut bar: Vec<Spans> = Vec::new();
     match conf.get_value().unwrap().as_str() {
         "standard" => bar.append(&mut vec![Spans::from(vec![Span::styled("Line: ", Style::default().fg(theme.no_target)),Span::styled(vert_cursor.to_string(), Style::default().fg(theme.target)),Span::styled(", Col: ", Style::default().fg(theme.no_target)),Span::styled(edit_cursor.to_string(), Style::default().fg(theme.target))]),Spans::from(vec![Span::styled("Mode: ", Style::default().fg(theme.no_target)),Span::styled(format!("{}",app.mode), Style::default().fg(theme.target))]),Spans::from(vec![Span::styled("Dir: ",Style::default().fg(theme.no_target)),Span::styled(env::current_dir().unwrap_or(PathBuf::new()).display().to_string(), Style::default().fg(theme.target))])]),
+        "custom" => bar.append(&mut gen_custom_stat(conf,theme,vert_cursor,edit_cursor,app)),
         _ => (),
     }
     if bar.len() == 0 {
@@ -410,4 +412,16 @@ fn gen_stat(app: &App,theme: &Theme,vert_cursor:&usize,edit_cursor:&usize,conf: 
         );
     }
     tui::widgets::Tabs::new(bar).block(Block::default().borders(Borders::ALL).border_style(Style::default().fg(theme.no_target)))
+}
+fn gen_custom_stat(conf: &mut Root<String>,theme: &Theme,vert_cursor:&usize,edit_cursor:&usize,app: &App) -> Vec<Spans<'static>>{
+    let mut res = Vec::new();
+    for root in conf.roots.iter_mut() {
+        match root.get_value().unwrap().as_str() {
+            "pos" => res.push(Spans::from(vec![Span::styled("Line: ", Style::default().fg(theme.no_target)),Span::styled(vert_cursor.to_string(), Style::default().fg(theme.target)),Span::styled(", Col: ", Style::default().fg(theme.no_target)),Span::styled(edit_cursor.to_string(), Style::default().fg(theme.target))])),
+            "mode" => res.push(Spans::from(vec![Span::styled("Mode: ", Style::default().fg(theme.no_target)),Span::styled(format!("{}",app.mode), Style::default().fg(theme.target))])),
+            "dir" => res.push(Spans::from(vec![Span::styled("Dir: ",Style::default().fg(theme.no_target)),Span::styled(env::current_dir().unwrap_or(PathBuf::new()).display().to_string(), Style::default().fg(theme.target))])),
+            _ => ()
+        }
+    }
+    res
 }
