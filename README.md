@@ -167,7 +167,7 @@ And regex matches like this:
 regex1 -> Green
 regex2 -> 12, 23, 4
 ```
-Note: You can use either use any color from the 'tui::style::Color' enum or an rgb value that is split like this
+Note: You can either use any color from the 'tui::style::Color' enum or an rgb value that is split like this
 > r, g, b
 
 ### Status Bar
