@@ -21,6 +21,8 @@ To install run:
 ```shell
 cargo install --git https://github.com/xelezard/btel.git
 ```
+or grab a binary from the releases section
+
 ## Usage
 When opening Btel you see two fields the "New File" and the "Command" block.
 
