@@ -228,7 +228,7 @@ fn render(f:&mut  Frame<'_,CrosstermBackend<io::Stdout>>, app: App,edit_cursor:&
     f.render_widget(status_bar, chunks[1]);
 }
 fn open(command: &String) -> Option<Vec<String>>{
-    let command = command.replace("~", &format!("{}",env!("HOME")));
+    let command = trim_home(command);
     let file_option =fs::read_to_string(command);
     if let Ok(file) = file_option {
         if !file.is_ascii() {
@@ -242,7 +242,7 @@ fn open(command: &String) -> Option<Vec<String>>{
     None
  }
 fn open_folder(command: &String) -> Option<String>{
-    let command = command.replace("~", &format!("{}",env!("HOME")));
+    let command = trim_home(command);
     if std::path::Path::new(&command).is_dir() {
         let mut new_command = command.to_string();
         if !command.contains(std::env::current_dir().unwrap().to_str().unwrap()) && !command.starts_with("/") {
@@ -262,7 +262,15 @@ fn open_folder(command: &String) -> Option<String>{
         return Some(new_command.to_owned());
     }
     None
- }
+}
+#[cfg(target_os = "linux")]
+fn trim_home(command: &String) -> String{
+    command.replace("~", &format!("{}",env!("HOME")))
+}
+#[cfg(target_os = "windows")]
+fn trim_home(command: &String) -> String {
+    command.to_string()
+}
 fn save(command: &String,file_name: &mut String,input:&Vec<String>,saved:&mut bool) {
     let text =input.join("\n");
     if command.len() == 0 && *file_name != String::from("New File"){
