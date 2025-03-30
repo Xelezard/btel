@@ -259,6 +259,7 @@ fn open_folder(command: &String) -> Option<String>{
         if new_command == String::new() {
             return None;
         }
+        env::set_current_dir(&new_command).unwrap();
         return Some(new_command.to_owned());
     }
     None
