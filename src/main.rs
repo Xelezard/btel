@@ -266,7 +266,7 @@ fn open_folder(command: &String) -> Option<String>{
 }
 #[cfg(target_os = "linux")]
 fn trim_home(command: &String) -> String{
-    command.replace("~", &format!("{}",env!("HOME")))
+    command.replace("~", &format!("{}",std::env::var("HOME").unwrap_or("~".to_string())))
 }
 #[cfg(target_os = "windows")]
 fn trim_home(command: &String) -> String {

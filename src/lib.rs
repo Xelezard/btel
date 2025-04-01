@@ -135,8 +135,8 @@ pub enum InclHighlight {
     Json
 }
 fn get_args(full_args: Vec<String>) -> Option<Vec<String>> {
-    if full_args.len() > 11 {
-        return Some(full_args[12..].iter().map(|a|a.to_string()).collect());
+    if full_args.len() > 12 {
+        return Some(full_args[12].split(" ").map(|a|a.to_string()).collect());
     }
     None
 }
@@ -145,9 +145,9 @@ pub fn set_btel_vars(vars: BtelVars) {
 }
 #[cfg(target_os = "linux")]
 pub fn btel_path() -> String{
-    format!("{}/.btel",env!("HOME"))
+    format!("{}/.btel",std::env::var("HOME").unwrap())
 }
 #[cfg(target_os = "windows")]
 pub fn btel_path() -> String{
-    format!("{}/.btel",env!("AppData"))
+    format!("{}/.btel",std::env::var("AppData").unwrap())
 }
