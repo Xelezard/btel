@@ -82,6 +82,7 @@ fn run(terminal:&mut Terminal<CrosstermBackend<io::Stdout>>,config_tree: &mut Ro
     let mut line_name = String::from("Command");
     let mut file_name = String::from("New File");
     let mut saved: bool = true;
+    let mut forced_save = false;
     let mut scroll_y:usize = 0;
     let mut scroll_x:usize = 0;
     let mut display = Display::Help;
@@ -92,9 +93,9 @@ fn run(terminal:&mut Terminal<CrosstermBackend<io::Stdout>>,config_tree: &mut Ro
     let mut targets_folder = false;
     let mut folder_cursor: usize = 0;
     let mut folder_error: Option<String> = None;
-    if args.len() == 2 {display = Display::Input;exc_command(&mut format!("o {}", args[1]),&mut output,&mut mode,&mut display,&mut input,&mut saved,&mut file_name,&mut line_name,&commands,&mut edit_cursor,&mut vert_cursor,&mut scroll_x,&mut scroll_y,&mut opened_folder,&mut files_in_folder,&mut folder_error)}
+    if args.len() == 2 {display = Display::Input;exc_command(&mut format!("o {}", args[1]),&mut output,&mut mode,&mut display,&mut input,&mut saved,&mut file_name,&mut line_name,&commands,&mut edit_cursor,&mut vert_cursor,&mut scroll_x,&mut scroll_y,&mut opened_folder,&mut files_in_folder,&mut folder_error,&mut forced_save)}
     loop {
-        let _ = terminal.draw(|f|render(f, App {mode: mode,input: &input,command: &command,line_name: &line_name,file_name: &file_name,output: &output,display: &display},&mut edit_cursor,&mut vert_cursor,&mut scroll_y,&mut scroll_x,&mut opened_folder,&files_in_folder,&targets_folder,&folder_cursor,&folder_error,highlight_config,them,config_tree));
+        let _ = terminal.draw(|f|render(f, App {mode: mode,input: &input,command: &command,line_name: &line_name,file_name: &file_name,output: &output,display: &display},&mut edit_cursor,&mut vert_cursor,&mut scroll_y,&mut scroll_x,&mut opened_folder,&files_in_folder,&targets_folder,&folder_cursor,&folder_error,highlight_config,them,config_tree,&mut saved,&mut forced_save));
         if let Event::Key(key) = event::read().unwrap() {
             if key.kind == KeyEventKind::Press {
                 folder_error = None;
@@ -105,7 +106,7 @@ fn run(terminal:&mut Terminal<CrosstermBackend<io::Stdout>>,config_tree: &mut Ro
                         match key.code {
                             KeyCode::Char(x) => {command += &x.to_string();},
                             KeyCode::Backspace => {let _ = command.pop();},
-                            KeyCode::Enter if !targets_folder => {exc_command(&mut command,&mut output,&mut mode,&mut display,&mut input,&mut saved,&mut file_name,&mut line_name,&commands,&mut edit_cursor,&mut vert_cursor,&mut scroll_x,&mut scroll_y,&mut opened_folder,&mut files_in_folder,&mut folder_error);hist_cursor = 0;if command != String::new() {history.push(command)}command = String::new();},
+                            KeyCode::Enter if !targets_folder => {exc_command(&mut command,&mut output,&mut mode,&mut display,&mut input,&mut saved,&mut file_name,&mut line_name,&commands,&mut edit_cursor,&mut vert_cursor,&mut scroll_x,&mut scroll_y,&mut opened_folder,&mut files_in_folder,&mut folder_error,&mut forced_save);hist_cursor = 0;if command != String::new() {history.push(command)}command = String::new();},
                             KeyCode::Esc => {command = String::new();},
                             KeyCode::Up if !targets_folder => {if hist_cursor + 1 < history.len() {hist_cursor += 1;command = get_from_history(history, &hist_cursor)} else {command = String::new();hist_cursor = 0}},
                             KeyCode::Down if !targets_folder => {if hist_cursor > 0 {hist_cursor -= 1;command = get_from_history(history, &hist_cursor)}else {command = String::new()}},
@@ -113,7 +114,7 @@ fn run(terminal:&mut Terminal<CrosstermBackend<io::Stdout>>,config_tree: &mut Ro
                             KeyCode::Up => {if folder_cursor > 0 {folder_cursor -= 1} else {folder_cursor = files_in_folder.len() - 1}},
                             KeyCode::Right => {if let Some(_) = opened_folder {targets_folder = false}},
                             KeyCode::Left => {if let Some(_) = opened_folder {targets_folder = true}},
-                            KeyCode::Enter => {exc_command(&mut format!("o {}/{}", opened_folder.as_ref().unwrap(),files_in_folder[folder_cursor]),&mut output,&mut mode,&mut display,&mut input,&mut saved,&mut file_name,&mut line_name,&commands,&mut edit_cursor,&mut vert_cursor,&mut scroll_x,&mut scroll_y,&mut opened_folder,&mut files_in_folder,&mut folder_error)},
+                            KeyCode::Enter => {exc_command(&mut format!("o {}/{}", opened_folder.as_ref().unwrap(),files_in_folder[folder_cursor]),&mut output,&mut mode,&mut display,&mut input,&mut saved,&mut file_name,&mut line_name,&commands,&mut edit_cursor,&mut vert_cursor,&mut scroll_x,&mut scroll_y,&mut opened_folder,&mut files_in_folder,&mut folder_error,&mut forced_save)},
                             _ => ()
                         }
                     },
@@ -146,7 +147,7 @@ fn run(terminal:&mut Terminal<CrosstermBackend<io::Stdout>>,config_tree: &mut Ro
         }
     }
 }
-fn render(f:&mut  Frame<'_,CrosstermBackend<io::Stdout>>, app: App,edit_cursor:&mut usize,vert_cursor:&mut usize,scroll: &mut usize,scroll_x: &mut usize,opened_folder: &mut Option<String>,files_in_folder: &Vec<String>,targets_folder: &bool,folder_cursor: &usize,folder_error: &Option<String>,highlight_config: &mut Vec<(String,Highlight)>,theme: &Theme,config_tree: &mut Root<String>) {
+fn render(f:&mut  Frame<'_,CrosstermBackend<io::Stdout>>, app: App,edit_cursor:&mut usize,vert_cursor:&mut usize,scroll: &mut usize,scroll_x: &mut usize,opened_folder: &mut Option<String>,files_in_folder: &Vec<String>,targets_folder: &bool,folder_cursor: &usize,folder_error: &Option<String>,highlight_config: &mut Vec<(String,Highlight)>,theme: &Theme,config_tree: &mut Root<String>,saved: &mut bool,forced_save: &mut bool) {
     let big_chunks = Layout::default()
     .direction(Direction::Horizontal)
     .margin(0)
@@ -199,7 +200,7 @@ fn render(f:&mut  Frame<'_,CrosstermBackend<io::Stdout>>, app: App,edit_cursor:&
     let mut standard_stat = Root::new("stat-bar", String::from("standard"));
     let status_bar = gen_stat(&app,theme,vert_cursor,edit_cursor,config_tree.get_child("stat-bar").unwrap_or(&mut standard_stat));
     let mut  text_spans = highlight::highlight(&text, highlight_config, app.file_name);
-    let input_block = Block::default().borders(Borders::ALL).border_type(theme.border_type).title(app.file_name.to_string()).border_style(match app.mode {Mode::Edit => Style::default().fg(theme.target), _ => Style::default().fg(theme.no_target).add_modifier(Modifier::DIM)});
+    let input_block = Block::default().borders(Borders::ALL).border_type(theme.border_type).title(Spans::from(vec![if  *forced_save{Span::styled("*", Style::default().fg(Color::Red).add_modifier(Modifier::CROSSED_OUT | Modifier::DIM))} else if *saved {Span::raw("")} else {Span::styled("*",Style::default().fg(Color::Red))},Span::raw(app.file_name)])).border_style(match app.mode {Mode::Edit => Style::default().fg(theme.target), _ => Style::default().fg(theme.no_target).add_modifier(Modifier::DIM)});
     let command_block = Block::default().borders(Borders::ALL).border_type(theme.border_type).title(app.line_name.to_string()).border_style(match targets_folder {false => Style::default().fg(theme.target), true => Style::default().fg(theme.no_target).add_modifier(Modifier::DIM)});
     if app.input.len() <= (*scroll + (chunks[0].height as usize)+2) {
         let on_screnn = Text::from(text_spans.lines.drain(*scroll..).as_slice().iter().map(|l|l.clone()).collect::<Vec<Spans>>());
@@ -301,7 +302,7 @@ fn find(command: &String,input:&Vec<String>,x:usize,y:usize) ->Option<(usize,usi
     }
     None
 }
-fn exc_command(command: &mut String,output:&mut String,mode: &mut Mode,display: &mut Display,input:&mut Vec<String>,saved: &mut bool,file_name: &mut String,line_name:&mut String,commands: &Vec<Extern>,edit_cursor:&mut usize,vert_cursor:&mut usize,scroll_x: &mut usize,scroll_y: &mut usize,opened_folder: &mut Option<String>,files_in_folder: &mut Vec<String>,folder_error: &mut Option<String>) {
+fn exc_command(command: &mut String,output:&mut String,mode: &mut Mode,display: &mut Display,input:&mut Vec<String>,saved: &mut bool,file_name: &mut String,line_name:&mut String,commands: &Vec<Extern>,edit_cursor:&mut usize,vert_cursor:&mut usize,scroll_x: &mut usize,scroll_y: &mut usize,opened_folder: &mut Option<String>,files_in_folder: &mut Vec<String>,folder_error: &mut Option<String>,forced_save: &mut bool) {
     let mut pieces: Vec<&str> = command.split_ascii_whitespace().collect();
     if pieces.len() == 0 {
         return ();
@@ -364,9 +365,9 @@ fn exc_command(command: &mut String,output:&mut String,mode: &mut Mode,display: 
                 *folder_error = Some(String::from("Unsaved Changes"));
             }
         },
-        BtelCommand::Save => {pieces.push("");save(&pieces[1].to_string(),file_name,&input,saved);}
+        BtelCommand::Save => {pieces.push("");save(&pieces[1].to_string(),file_name,&input,saved);*forced_save = false}
         BtelCommand::Edit => {*mode = Mode::Edit},
-        BtelCommand::ForceSave => {*saved = true},
+        BtelCommand::ForceSave => {*saved = true;*forced_save = true},
         BtelCommand::Quit => {*mode = Mode::Quit},
         BtelCommand::Find => {*mode = Mode::Find(0, 0)}      
         BtelCommand::Help => {*display = Display::Help}
