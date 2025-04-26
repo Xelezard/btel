@@ -78,7 +78,7 @@ pub fn render(f:&mut  Frame<'_,CrosstermBackend<std::io::Stdout>>, app: App,scro
         let help = Paragraph::new(HELP_MESSAGE).block(input_block);
         f.render_widget(help,chunks[0]);    
     }
-    if app.mode == Mode::Edit {
+    if matches!(app.mode,Mode::Edit|Mode::Find(_,_)) {
         f.set_cursor(chunks[0].x + (app.textbox.edit_cursor as u16) + 1 - (*scroll_x as u16), (app.textbox.vert_cursor as u16) + chunks[0].y + 1 - (*scroll as u16));
     }   else {
         f.set_cursor(chunks[2].x +1 + (app.command.len() as u16), chunks[2].y + 1);

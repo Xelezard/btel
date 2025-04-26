@@ -19,9 +19,8 @@ A simple hobby project text editor written in rust
 ## Install
 To install run:
 ```shell
-cargo install --git https://github.com/xelezard/btel.git
+cargo install --git https://github.com/xelezard/btel.git btel
 ```
-or grab a binary from the releases section
 
 ## Usage
 When opening Btel you see two fields the "New File" and the "Command" block.
@@ -34,7 +33,6 @@ Use the "edit" command to go into edit mode.
 
 ### Commands
 Note: commands used only to switch modes aren't listed here
-
 Note: each Command may have a shorter version
 
 #### Open
