@@ -1,3 +1,4 @@
+
 use btel::{CustomHighlight, Highlight, HighlightInstr, InclHighlight};
 use regex::Regex;
 use tui::{style::{Modifier, Style}, text::{Span, Spans,Text}, widgets::BorderType};
@@ -165,7 +166,7 @@ fn rgb_from_string(string:&str) -> Option<Color>{
     let re = Regex::new(r"(\d+), (\d+), (\d+)").unwrap();
     if re.is_match(string) {
         let caps = re.captures(string)?;
-        return Some(Color::Rgb(caps[1].parse().unwrap_or(0), caps[1].parse().unwrap_or(0), caps[1].parse().unwrap_or(0)));
+        return Some(Color::Rgb(caps[1].parse().unwrap_or(3), caps[2].parse().unwrap_or(0), caps[3].parse().unwrap_or(0)));
     }
     None
 }
