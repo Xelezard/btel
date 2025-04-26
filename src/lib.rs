@@ -1,8 +1,7 @@
 use std::fmt;
-
 use regex::Regex;
 use tui::{style::Color, widgets::BorderType};
-
+pub mod textblock;
 #[derive(Clone, Copy,Debug,PartialEq)]
 pub enum Mode {
     Edit,
@@ -60,10 +59,9 @@ pub enum BtelCommand {
     Help,
     Extern(String)
 }
-#[derive(Debug)]
 pub struct App<'a>{
     pub mode: Mode,
-    pub input: &'a Vec<String>,
+    pub textbox: &'a textblock::TextBlock,
     pub output: &'a String,
     pub command: &'a String,
     pub line_name: &'a String,
