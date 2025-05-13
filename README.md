@@ -25,81 +25,45 @@ cargo install --git https://github.com/xelezard/btel.git btel
 ## Usage
 When opening Btel you see two fields the "New File" and the "Command" block.
 
-Currently, you are in "Command" mode.
+Currently, you are in the command block.
 
 Type a command into "Command" field to execute it. (Command explanation below)
 
 Use the "edit" command to go into edit mode.
 
 ### Commands
-Note: commands used only to switch modes aren't listed here
-Note: each Command may have a shorter version
+Note: each command has short versin (command -> c)
 
-#### Open
-"open" or "o"
+#### edit or e
+close the command block and enter the edit mode
 
-Used to open a file replacing the current one
+to go back press esc
 
-If you open a directory, a side drawer will open displaying all the files
+#### quit or q
+if everything is saved exit btel
 
-Now press right to be able to choose a file and accept with enter
+#### open or o
+if everything is saved open the specified file
 
 > open file.txt
 
-#### Save 
-"save" or "s"
+#### save or s
+save the currently opened file with the specified file name
 
-Used to save the file
+if no name was specified, the file will be saved as its current name
 
-If no file was supplied and the file name is known, the file will be saved to the same location
+#### find or f
+temporarily replace the command line with a search field
 
-> save file.txt
+press esc to bring back the command line
 
-or if the file has previously been saved
+#### force_save or fs
+enforce the saved state
 
-> save
+this will let you exit and open new files without actually saving 
 
-#### Command
-"command" or "c"
-
-Used to execute a shell command **temporarily** replacing the text field
-
-> command echo Hello World
-
-#### Force Save
-"force save" or "fs"
-
-Used to force the saved state (Open and quit think there are no unsaved changes)
-
-> force save
-
-#### Help
-"help" or "h"
-
-Display the help message again
-
-> help
-
-### Modes
-Each mode has a command to switch to the corresponding mode
-
-Press esc to go back to command mode
-
-> Mode Name -- Command
-> 
-> Mode usage
-
-#### Edit mode -- 'e' or 'edit' 
-In this mode you can write to the file.
-
-#### Quit mode -- 'q' or 'quit'
-Press any key to exit Btel if all changes are saved.
-
-#### Find mode -- 'f' or 'find'
-Enter your pattern and hit enter to move the cursor to the next finding.
-
-#### Command mode
-Enter a command to execute it
+#### help or h
+bring back the help message that was displayed at the start
 
 ## Configuration
 The config file is located at:

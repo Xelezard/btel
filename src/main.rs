@@ -222,7 +222,7 @@ fn exc_command(command: &mut String,output:&mut String,mode: &mut Mode,display: 
         "s" | "save" => {BtelCommand::Save},
         "c" | "command" => {BtelCommand::Command},
         "f" | "find" => {BtelCommand::Find},
-        "fs" | "force save" => {BtelCommand::ForceSave},
+        "fs" | "force_save" => {BtelCommand::ForceSave},
         "h" | "help" => {BtelCommand::Help},
         x if (commands.iter().map(|c|c.names.clone()).collect::<Vec<Vec<String>>>().concat()).contains(&x.to_string()) => {BtelCommand::Extern(String::from(x))}
         _ => {BtelCommand::Error}
