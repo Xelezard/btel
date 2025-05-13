@@ -17,7 +17,8 @@ impl TextBlock {
         if self.edit_cursor != 0 {
             if self.edit_cursor == self.input[self.vert_cursor].len() {
                 let _ = self.input[self.vert_cursor].pop();
-                self.edit_cursor -= 1
+                self.edit_cursor -= 1;
+                self.saved = false
             } else {
                 let _ = self.input[self.vert_cursor].remove(self.edit_cursor - 1);
                 self.edit_cursor -= 1;
@@ -28,7 +29,8 @@ impl TextBlock {
             let len = rest.len();
             self.input[self.vert_cursor - 1].append(&mut rest);
             self.vert_cursor -= 1;
-            self.edit_cursor = self.input[self.vert_cursor].len() - len
+            self.edit_cursor = self.input[self.vert_cursor].len() - len;
+            self.saved = false
         }
     }
     pub fn delete(&mut self) {
@@ -37,7 +39,6 @@ impl TextBlock {
                 let _ = self.input[self.vert_cursor].pop();
             } else {
                 let _ = self.input[self.vert_cursor].remove(self.edit_cursor + 1);
-                /*edit_cursor -= 1;*/
             }
         } else if self.vert_cursor + 1 != self.input.len() {
             let mut rest = self.input.remove(self.vert_cursor + 1);
@@ -50,6 +51,7 @@ impl TextBlock {
         self.input.insert(self.vert_cursor+1,line);
         self.vert_cursor += 1;
         self.edit_cursor = 0;
+        self.saved = false
     }
     pub fn left(&mut self) {
         if self.edit_cursor != 0 {
