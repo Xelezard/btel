@@ -121,16 +121,16 @@ fn run(terminal:&mut Terminal<CrosstermBackend<io::Stdout>>,config_tree: &mut Ro
                         }
                     },
                     Mode::Edit => match key.code {
-                        KeyCode::Char(x) => textbox.write(x),
-                        KeyCode::Backspace => textbox.backspace(),
-                        KeyCode::Delete => textbox.delete(),
-                        KeyCode::Enter => textbox.enter(),
+                        KeyCode::Char(x) => {let og = textbox.saved;textbox.write(x);if og != textbox.saved {forced_save = false}}
+                        KeyCode::Backspace => {let og = textbox.saved;textbox.backspace();if og != textbox.saved {forced_save = false}}
+                        KeyCode::Delete => {let og = textbox.saved;textbox.delete();if og != textbox.saved {forced_save = false}}
+                        KeyCode::Enter => {let og = textbox.saved;textbox.enter();if og != textbox.saved {forced_save = false}}
                         KeyCode::Esc => {mode = Mode::Command;line_name = String::from("Command")},
-                        KeyCode::Left => textbox.left(),
-                        KeyCode::Right => textbox.right(),
-                        KeyCode::Up => textbox.up(),
-                        KeyCode::Down => textbox.down(),
-                        KeyCode::Tab => textbox.tab(),
+                        KeyCode::Left => {let og = textbox.saved;textbox.left();if og != textbox.saved {forced_save = false}}
+                        KeyCode::Right => {let og = textbox.saved;textbox.right();if og != textbox.saved {forced_save = false}}
+                        KeyCode::Up => {let og = textbox.saved;textbox.up();if og != textbox.saved {forced_save = false}}
+                        KeyCode::Down => {let og = textbox.saved;textbox.down();if og != textbox.saved {forced_save = false}}
+                        KeyCode::Tab => {let og = textbox.saved;textbox.tab();if og != textbox.saved {forced_save = false}}
                         _ => ()
                     },
                     Mode::Quit => if textbox.saved {return Ok(())} else {mode = Mode::Command;line_name = String::from("Unsaved changes use fs to force the saved state")},
