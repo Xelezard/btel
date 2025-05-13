@@ -25,9 +25,10 @@ impl TextBlock {
             }
         } else if self.vert_cursor != 0 {
             let mut rest = self.input.remove(self.vert_cursor);
+            let len = rest.len();
             self.input[self.vert_cursor - 1].append(&mut rest);
             self.vert_cursor -= 1;
-            self.edit_cursor = self.input[self.vert_cursor].len() - rest.len()
+            self.edit_cursor = self.input[self.vert_cursor].len() - len
         }
     }
     pub fn delete(&mut self) {
