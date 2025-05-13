@@ -14,7 +14,6 @@ fn rust_highlight<'a>(text: &String) -> Text<'a> {
         (Regex::new(r"u8|u16|u32|u64|u128|usize|i8|i16|i32|i64|i128|isize|f32|f64|bool|char|str").unwrap(),Style::default().fg(Color::Rgb(229, 192, 123))),
         (Regex::new(r"fn|let|mut|if|else|match|while|for|loop|in|return|break|continue|struct|enum|impl|trait|const|static|use|pub|crate|mod|super|self|Self|as|ref|type|where|unsafe|dyn|async|await|move|extern|box|union|default").unwrap(),Style::default().fg(Color::Rgb(198, 120, 221))),
         (Regex::new(r"'[a-zA-Z_][a-zA-Z0-9_]*").unwrap(),Style::default().fg(Color::Rgb(255, 85, 85))),
-        (Regex::new(r#""([^"\\]|\\.)*""#).unwrap(),Style::default().fg(Color::Rgb(152, 195, 121))),
         (Regex::new(r"[0-9][0-9_]*(\.[0-9_]+)?([eE][+-]?[0-9_]+)?").unwrap(),Style::default().fg(Color::Rgb(209, 154, 102))),
         (Regex::new(r"//.*").unwrap(),Style::default().fg(Color::Rgb(106, 153, 85)).add_modifier(Modifier::DIM)),
         (Regex::new(r"/\*.*?\*/").unwrap(),Style::default().fg(Color::Rgb(106, 153, 85)).add_modifier(Modifier::DIM)),
@@ -22,6 +21,7 @@ fn rust_highlight<'a>(text: &String) -> Text<'a> {
         (Regex::new(r"[a-zA-Z_][a-zA-Z0-9_]*!").unwrap(),Style::default().fg(Color::Rgb(255, 203, 107))),
         (Regex::new(r"#\[[^\]]*\]").unwrap(),Style::default().fg(Color::Rgb(130, 170, 255))),
         (Regex::new(r"[A-Z][a-zA-Z0-9_]+").unwrap(),Style::default().fg(Color::Rgb(86, 156, 214))),
+        (Regex::new("[a-z]*\"[^(\\*\")]*\"").unwrap(),Style::default().fg(Color::Rgb(152, 195, 121))),
     ], text);
     text_from_spans(spans)
 }

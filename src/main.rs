@@ -250,6 +250,7 @@ fn exc_command(command: &mut String,output:&mut String,mode: &mut Mode,display: 
         },
         BtelCommand::Open if pieces.len() == 2 => {
             if textbox.saved {
+                *forced_save = false;
                 if let Some(file) = open(&pieces[1].to_string()) {
                     textbox.input = file.iter().map(|s| s.chars().collect()).collect();
                     *file_name = String::from(pieces[1]);
