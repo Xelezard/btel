@@ -7,12 +7,22 @@ use tree::Root;
 const  BRACKET_COLOR: [Color;3] = [Color::Yellow,Color::Rgb(255, 123, 207),Color::Rgb(73, 22, 255)];
 fn rust_highlight<'a>(text: &String) -> Text<'a> {
     let mut spans: Vec<Span> = text.chars().map(|c|Span::styled(c.to_string(), Style::default())).collect();
-    color_brackets(&mut spans,"{","}");
-    color(&mut spans, vec![(Regex::new(r"(fn |pub |let [^=]+|use |impl |mod |static [^=]+|const [^=]+)").unwrap(),Style::default().fg(Color::Rgb(0, 0, 200))),(Regex::new(r"(loop |for |in |while |return |match |mut |if )").unwrap(),Style::default().fg(Color::Rgb(173, 12, 170))),(Regex::new(r"([\w\-_!]+\(|\(|\))").unwrap(),Style::default().fg(Color::Rgb(167, 125, 0))),(Regex::new(r"([^ ]+::|[A-Z][a-z]+)").unwrap(),Style::default().add_modifier(Modifier::UNDERLINED).fg(Color::Yellow))], text);
+    color_brackets(&mut spans, "{", "}");
     color_brackets(&mut spans, "(", ")");
     color_brackets(&mut spans, "[", "]");
-    color_brackets(&mut spans, "<", ">");
-    color(&mut spans, vec![(Regex::new(r"(#(!)*\[[^\]]+\]|!|\?|;|&|(-|\+|\*|/)*=(>|<|=)*| >|< |\+ |\- |\*| / |->)").unwrap(),Style::default().fg(Color::Rgb(156, 1, 10))),(Regex::new(r"\d").unwrap(),Style::default().fg(Color::Rgb(223, 123, 123))),(Regex::new("[a-z]*\"[^(\\*\")]*\"").unwrap(),Style::default().fg(Color::Rgb(2, 80, 0))),(Regex::new(r"(//[^\n]+|/\*[^(*/)]+\*/)").unwrap(),Style::default().add_modifier(Modifier::DIM).fg(Color::DarkGray))], text);
+    color(&mut spans, vec![    
+        (Regex::new(r"u8|u16|u32|u64|u128|usize|i8|i16|i32|i64|i128|isize|f32|f64|bool|char|str").unwrap(),Style::default().fg(Color::Rgb(229, 192, 123))),
+        (Regex::new(r"fn|let|mut|if|else|match|while|for|loop|in|return|break|continue|struct|enum|impl|trait|const|static|use|pub|crate|mod|super|self|Self|as|ref|type|where|unsafe|dyn|async|await|move|extern|box|union|default").unwrap(),Style::default().fg(Color::Rgb(198, 120, 221))),
+        (Regex::new(r"'[a-zA-Z_][a-zA-Z0-9_]*").unwrap(),Style::default().fg(Color::Rgb(255, 85, 85))),
+        (Regex::new(r#""([^"\\]|\\.)*""#).unwrap(),Style::default().fg(Color::Rgb(152, 195, 121))),
+        (Regex::new(r"[0-9][0-9_]*(\.[0-9_]+)?([eE][+-]?[0-9_]+)?").unwrap(),Style::default().fg(Color::Rgb(209, 154, 102))),
+        (Regex::new(r"//.*").unwrap(),Style::default().fg(Color::Rgb(106, 153, 85)).add_modifier(Modifier::DIM)),
+        (Regex::new(r"/\*.*?\*/").unwrap(),Style::default().fg(Color::Rgb(106, 153, 85)).add_modifier(Modifier::DIM)),
+        (Regex::new(r"fn [a-zA-Z_][a-zA-Z0-9_]*").unwrap(),Style::default().fg(Color::Rgb(97, 175, 239))),
+        (Regex::new(r"[a-zA-Z_][a-zA-Z0-9_]*!").unwrap(),Style::default().fg(Color::Rgb(255, 203, 107))),
+        (Regex::new(r"#\[[^\]]*\]").unwrap(),Style::default().fg(Color::Rgb(130, 170, 255))),
+        (Regex::new(r"[A-Z][a-zA-Z0-9_]+").unwrap(),Style::default().fg(Color::Rgb(86, 156, 214))),
+    ], text);
     text_from_spans(spans)
 }
 fn json_highlight<'a>(text: &String) -> Text<'a>{
