@@ -84,6 +84,10 @@ fn run(terminal:&mut Terminal<CrosstermBackend<io::Stdout>>,config_tree: &mut Ro
     let mut targets_folder = false;
     let mut folder_cursor: usize = 0;
     let mut folder_error: Option<String> = None;
+    let esc_mode = match config_tree.get_child("esc-mode").unwrap_or(&mut Root::new("esc-mode", "Command".into())).get_value().unwrap_or(&"Command".to_string()).as_str() {
+        "View" => Mode::View,
+        _ => Mode::Command
+    };
     if args.len() == 2 {display = Display::Input;exc_command(&mut format!("o {}", args[1]),&mut output,&mut mode,&mut display,&mut textbox,&mut file_name,&mut line_name,&commands,&mut scroll_x,&mut scroll_y,&mut opened_folder,&mut files_in_folder,&mut folder_error,&mut forced_save)}
     loop {
         let _ = terminal.draw(|f|render::render(f, App {mode: mode,textbox: &textbox,command: &command,line_name: &line_name,file_name: &file_name,output: &output,display: &display},&mut scroll_y,&mut scroll_x,&mut opened_folder,&files_in_folder,&targets_folder,&folder_cursor,&folder_error,highlight_config,them,config_tree,&mut forced_save));
@@ -124,7 +128,7 @@ fn run(terminal:&mut Terminal<CrosstermBackend<io::Stdout>>,config_tree: &mut Ro
                         KeyCode::Backspace => textbox.backspace(),
                         KeyCode::Delete => textbox.delete(),
                         KeyCode::Enter => textbox.enter(),
-                        KeyCode::Esc => {mode = Mode::Command;line_name = String::from("Command")},
+                        KeyCode::Esc => {mode = esc_mode;if mode == Mode::View {view::view_from_input(&mut textbox,&mut files_in_folder);} else {line_name = String::from("Command")}},
                         KeyCode::Left => textbox.left(textblock::Target::Input),
                         KeyCode::Right => textbox.right(textblock::Target::Input),
                         KeyCode::Up => textbox.up(textblock::Target::Input),
@@ -133,6 +137,8 @@ fn run(terminal:&mut Terminal<CrosstermBackend<io::Stdout>>,config_tree: &mut Ro
                         _ => ()
                     },
                     Mode::View => match key.code {
+                        KeyCode::Char('e') => mode = Mode::Edit,
+                        KeyCode::Char('c') => mode = Mode::Command,
                         KeyCode::Enter => action(&mut textbox,&mut file_name,&mut files_in_folder,&mut opened_folder,&mut line_name,&mut folder_error),
                         KeyCode::Esc => {mode = Mode::Command;line_name = String::from("Command")},
                         KeyCode::Left => textbox.left(textblock::Target::View),
@@ -221,6 +227,7 @@ fn exc_command(command: &mut String,output:&mut String,mode: &mut Mode,display: 
                     textbox.input = file.iter().map(|s| s.chars().collect()).collect();
                     *file_name = String::from(pieces[1]);
                     textbox.saved = true;
+                    *forced_save = false;
                     textbox.vert_cursor = 0;
                     textbox.edit_cursor = 0;
                 } else if let  Some(folder) = btel::open_folder(&pieces[1].to_string()) {
@@ -247,7 +254,7 @@ fn exc_command(command: &mut String,output:&mut String,mode: &mut Mode,display: 
         BtelCommand::Find => {*mode = Mode::Find(0, 0)}      
         BtelCommand::Help => {*display = Display::Help}
         BtelCommand::Extern(command) => {let mut path: &String = &String::new();for c in commands {if c.names.contains(&command) {path = &c.path};let mut plugin = Command::new(path);plugin.args(vec![&textbox.input.iter().map(|v|v.iter().map(|c|c.to_string()).collect::<String>()).collect::<Vec<String>>().join("\n"),&output,&textbox.edit_cursor.to_string(),&textbox.vert_cursor.to_string(),&format!("{mode:?}"),line_name,file_name,&textbox.saved.to_string(),&scroll_x.to_string(),&scroll_y.to_string(),&format!("{display:?}"),&pieces[1..].join(" ")]);let out = String::from_utf8(plugin.output().expect("Plugin didn't work").stdout).expect("plugin didn't work");let mut new_args: Vec<String> = vec![String::new()];new_args.append(&mut out.split("\n\t\n").map(|l|l.to_string()).collect::<Vec<String>>());let new_vars: BtelVars = get_btel_vars(new_args);set_from_btel_vars(new_vars, textbox, output,mode, line_name, file_name,scroll_x, scroll_y, display);};} 
-        BtelCommand::View => {*mode = Mode::View;view::view_from_input(textbox,files_in_folder);textbox.edit_cursor = 0;textbox.vert_cursor = 0},
+        BtelCommand::View => {*mode = Mode::View;view::view_from_input(textbox,files_in_folder);},
         _ => *line_name = String::from("Command not found."),
     }
 }

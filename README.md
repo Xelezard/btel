@@ -15,6 +15,7 @@ A simple hobby project text editor written in rust
   - json 
   - any other language if you [configure](#configuration) it
 - Status Bar
+- Opening links to webpages or other files in the folder
 
 ## Install
 To install run:
@@ -38,6 +39,14 @@ Note: each command has short versin (command -> c)
 close the command block and enter the edit mode
 
 to go back press esc
+
+#### view or v
+close the command block and enter the view mode
+
+view mode is like edit mode but you can't edit anything
+
+when entering view mode your file is scanned for links and files in your folder
+press enter while targeting one with your cursor to open it
 
 #### quit or q
 if everything is saved exit btel
@@ -153,6 +162,15 @@ Note: for the custom declaration you can use one of these three options
 - pos (Line: 0, Col: 2)
 - mode (Mode: Edit)
 - dir (Dir: your/working/dir)
+
+### esc-mode
+esc-mode specifies if you enter command or view mode when leaving edit mode
+
+```
+esc-mode -> View
+#or
+esc-mode -> Command
+```
 
 ## Plugins
 Plugins are external commands configured in the 'commands' section of the config.tr
