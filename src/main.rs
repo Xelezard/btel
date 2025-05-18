@@ -6,9 +6,8 @@ use tui::{
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind}, execute, terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen}
 };
-use btel::*;
+use btel::{view::action, *};
 use tui::widgets::BorderType;
-mod highlight;
 use tree::Root;
 mod render;
 const HELP_MESSAGE: &str = include_str!("../HELP.msg");
@@ -121,16 +120,25 @@ fn run(terminal:&mut Terminal<CrosstermBackend<io::Stdout>>,config_tree: &mut Ro
                         }
                     },
                     Mode::Edit => match key.code {
-                        KeyCode::Char(x) => {let og = textbox.saved;textbox.write(x);if og != textbox.saved {forced_save = false}}
-                        KeyCode::Backspace => {let og = textbox.saved;textbox.backspace();if og != textbox.saved {forced_save = false}}
-                        KeyCode::Delete => {let og = textbox.saved;textbox.delete();if og != textbox.saved {forced_save = false}}
-                        KeyCode::Enter => {let og = textbox.saved;textbox.enter();if og != textbox.saved {forced_save = false}}
+                        KeyCode::Char(x) => textbox.write(x),
+                        KeyCode::Backspace => textbox.backspace(),
+                        KeyCode::Delete => textbox.delete(),
+                        KeyCode::Enter => textbox.enter(),
                         KeyCode::Esc => {mode = Mode::Command;line_name = String::from("Command")},
-                        KeyCode::Left => {let og = textbox.saved;textbox.left();if og != textbox.saved {forced_save = false}}
-                        KeyCode::Right => {let og = textbox.saved;textbox.right();if og != textbox.saved {forced_save = false}}
-                        KeyCode::Up => {let og = textbox.saved;textbox.up();if og != textbox.saved {forced_save = false}}
-                        KeyCode::Down => {let og = textbox.saved;textbox.down();if og != textbox.saved {forced_save = false}}
-                        KeyCode::Tab => {let og = textbox.saved;textbox.tab();if og != textbox.saved {forced_save = false}}
+                        KeyCode::Left => textbox.left(textblock::Target::Input),
+                        KeyCode::Right => textbox.right(textblock::Target::Input),
+                        KeyCode::Up => textbox.up(textblock::Target::Input),
+                        KeyCode::Down => textbox.down(textblock::Target::Input),
+                        KeyCode::Tab => textbox.tab(),
+                        _ => ()
+                    },
+                    Mode::View => match key.code {
+                        KeyCode::Enter => action(&mut textbox,&mut file_name,&mut files_in_folder,&mut opened_folder,&mut line_name,&mut folder_error),
+                        KeyCode::Esc => {mode = Mode::Command;line_name = String::from("Command")},
+                        KeyCode::Left => textbox.left(textblock::Target::View),
+                        KeyCode::Right => textbox.right(textblock::Target::View),
+                        KeyCode::Up => textbox.up(textblock::Target::View),
+                        KeyCode::Down => textbox.down(textblock::Target::View),
                         _ => ()
                     },
                     Mode::Quit => if textbox.saved {return Ok(())} else {mode = Mode::Command;line_name = String::from("Unsaved changes use fs to force the saved state")},
@@ -138,48 +146,6 @@ fn run(terminal:&mut Terminal<CrosstermBackend<io::Stdout>>,config_tree: &mut Ro
             }
         }
     }
-}
-fn open(command: &String) -> Option<Vec<String>>{
-    let command = trim_home(command);
-    let file_option =fs::read_to_string(command);
-    if let Ok(file) = file_option {
-        let file = file.replace("\t", "    ");
-        let split:Vec<&str> = file.split("\n").collect();
-        let s: Vec<String> = split.iter().map(|f|f.to_string()).collect();
-        return Some(s);
-    }
-    None
- }
-fn open_folder(command: &String) -> Option<String>{
-    let command = trim_home(command);
-    if std::path::Path::new(&command).is_dir() {
-        let mut new_command = command.to_string();
-        if !command.contains(std::env::current_dir().unwrap().to_str().unwrap()) && !command.starts_with("/") {
-            new_command = format!("{}/{}",std::env::current_dir().unwrap().to_str().unwrap(),command.to_string());
-        }
-        if new_command.ends_with("..") {
-            let new = new_command.split("/").collect::<Vec<&str>>().iter().rev().collect::<Vec<&&str>>().iter().skip(2).rev().map(|c|c.to_string()).collect::<Vec<String>>().join("/");
-            new_command = new;
-        } 
-        if new_command.ends_with(".") {
-            new_command.remove(new_command.len()-1);
-            new_command.remove(new_command.len()-1);
-        }
-        if new_command == String::new() {
-            return None;
-        }
-        env::set_current_dir(&new_command).unwrap();
-        return Some(new_command.to_owned());
-    }
-    None
-}
-#[cfg(target_os = "linux")]
-fn trim_home(command: &String) -> String{
-    command.replace("~", &format!("{}",std::env::var("HOME").unwrap_or("~".to_string())))
-}
-#[cfg(target_os = "windows")]
-fn trim_home(command: &String) -> String {
-    command.to_string()
 }
 fn save(command: &String,file_name: &mut String,input:&Vec<Vec<char>>,saved:&mut bool) {
     let text: String =input.iter().map(|v|v.iter().map(|c|c.to_string()).collect::<String>()).collect::<Vec<String>>().join("\n");
@@ -224,6 +190,7 @@ fn exc_command(command: &mut String,output:&mut String,mode: &mut Mode,display: 
         "f" | "find" => {BtelCommand::Find},
         "fs" | "force_save" => {BtelCommand::ForceSave},
         "h" | "help" => {BtelCommand::Help},
+        "v" | "view" => {BtelCommand::View},
         x if (commands.iter().map(|c|c.names.clone()).collect::<Vec<Vec<String>>>().concat()).contains(&x.to_string()) => {BtelCommand::Extern(String::from(x))}
         _ => {BtelCommand::Error}
     };
@@ -250,14 +217,13 @@ fn exc_command(command: &mut String,output:&mut String,mode: &mut Mode,display: 
         },
         BtelCommand::Open if pieces.len() == 2 => {
             if textbox.saved {
-                *forced_save = false;
                 if let Some(file) = open(&pieces[1].to_string()) {
                     textbox.input = file.iter().map(|s| s.chars().collect()).collect();
                     *file_name = String::from(pieces[1]);
                     textbox.saved = true;
                     textbox.vert_cursor = 0;
                     textbox.edit_cursor = 0;
-                } else if let  Some(folder) = open_folder(&pieces[1].to_string()) {
+                } else if let  Some(folder) = btel::open_folder(&pieces[1].to_string()) {
                     *files_in_folder = vec![String::from("..")];
                     *opened_folder = Some(folder.to_string());
                     for result in fs::read_dir(&folder).expect(&folder) {
@@ -281,6 +247,7 @@ fn exc_command(command: &mut String,output:&mut String,mode: &mut Mode,display: 
         BtelCommand::Find => {*mode = Mode::Find(0, 0)}      
         BtelCommand::Help => {*display = Display::Help}
         BtelCommand::Extern(command) => {let mut path: &String = &String::new();for c in commands {if c.names.contains(&command) {path = &c.path};let mut plugin = Command::new(path);plugin.args(vec![&textbox.input.iter().map(|v|v.iter().map(|c|c.to_string()).collect::<String>()).collect::<Vec<String>>().join("\n"),&output,&textbox.edit_cursor.to_string(),&textbox.vert_cursor.to_string(),&format!("{mode:?}"),line_name,file_name,&textbox.saved.to_string(),&scroll_x.to_string(),&scroll_y.to_string(),&format!("{display:?}"),&pieces[1..].join(" ")]);let out = String::from_utf8(plugin.output().expect("Plugin didn't work").stdout).expect("plugin didn't work");let mut new_args: Vec<String> = vec![String::new()];new_args.append(&mut out.split("\n\t\n").map(|l|l.to_string()).collect::<Vec<String>>());let new_vars: BtelVars = get_btel_vars(new_args);set_from_btel_vars(new_vars, textbox, output,mode, line_name, file_name,scroll_x, scroll_y, display);};} 
+        BtelCommand::View => {*mode = Mode::View;view::view_from_input(textbox,files_in_folder);textbox.edit_cursor = 0;textbox.vert_cursor = 0},
         _ => *line_name = String::from("Command not found."),
     }
 }
@@ -304,6 +271,8 @@ fn set_from_btel_vars(vars: BtelVars,textbox:&mut textblock::TextBlock,output:&m
         vert_cursor: vars.vert_cursor,
         edit_cursor: vars.edit_cursor,
         saved: vars.saved,
+        view: vec![Vec::new()],
+        view_info: Vec::new()
     };
     *output = vars.output;
     *mode = vars.mode;
@@ -323,7 +292,7 @@ fn get_from_history(history: &Vec<String>,hist_cursor:&usize) -> String {
 pub fn gen_stat<'a>(app: &App,theme: &Theme,vert_cursor:&usize,edit_cursor:&usize,conf: &'a mut Root<String>) -> Tabs<'a> {
     let mut bar: Vec<Spans> = Vec::new();
     match conf.get_value().unwrap().as_str() {
-        "standard" => bar.append(&mut vec![Spans::from(vec![Span::styled("Line: ", Style::default().fg(theme.no_target)),Span::styled(vert_cursor.to_string(), Style::default().fg(theme.target)),Span::styled(", Col: ", Style::default().fg(theme.no_target)),Span::styled(edit_cursor.to_string(), Style::default().fg(theme.target))]),Spans::from(vec![Span::styled("Mode: ", Style::default().fg(theme.no_target)),Span::styled(format!("{}",app.mode), Style::default().fg(theme.target))]),Spans::from(vec![Span::styled("Dir: ",Style::default().fg(theme.no_target)),Span::styled(env::current_dir().unwrap_or(PathBuf::new()).display().to_string(), Style::default().fg(theme.target))])]),
+        "standard" => bar.append(&mut vec![Spans::from(vec![Span::styled("Line: ", Style::default().fg(theme.no_target)),Span::styled((vert_cursor +1).to_string(), Style::default().fg(theme.target)),Span::styled(", Col: ", Style::default().fg(theme.no_target)),Span::styled((edit_cursor+1).to_string(), Style::default().fg(theme.target))]),Spans::from(vec![Span::styled("Mode: ", Style::default().fg(theme.no_target)),Span::styled(format!("{}",app.mode), Style::default().fg(theme.target))]),Spans::from(vec![Span::styled("Dir: ",Style::default().fg(theme.no_target)),Span::styled(env::current_dir().unwrap_or(PathBuf::new()).display().to_string(), Style::default().fg(theme.target))])]),
         "custom" => bar.append(&mut gen_custom_stat(conf,theme,vert_cursor,edit_cursor,app)),
         _ => (),
     }

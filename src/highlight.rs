@@ -1,5 +1,5 @@
 
-use btel::{CustomHighlight, Highlight, HighlightInstr, InclHighlight};
+use crate::{CustomHighlight, Highlight, HighlightInstr, InclHighlight};
 use regex::Regex;
 use tui::{style::{Modifier, Style}, text::{Span, Spans,Text}, widgets::BorderType};
 use tui::style::Color;
@@ -32,7 +32,7 @@ fn json_highlight<'a>(text: &String) -> Text<'a>{
     color(&mut spans, vec![(Regex::new(r":").unwrap(),Style::default().fg(Color::Rgb(0, 0, 200))),(Regex::new(r"\d").unwrap(),Style::default().fg(Color::Rgb(223, 123, 123))),(Regex::new(r"(true|false)").unwrap(),Style::default().fg(Color::LightMagenta)),(Regex::new("[a-z]*\"[^(\\*\")]*\"").unwrap(),Style::default().fg(Color::Rgb(2, 80, 0)))], text);
     text_from_spans(spans)
 }
-fn text_from_spans(spans: Vec<Span>) -> Text {
+pub fn text_from_spans(spans: Vec<Span>) -> Text {
     let mut text_lines: Vec<Spans> = vec![Spans::default()];
     for span in spans {
         if span.content == "\n" {
@@ -106,8 +106,8 @@ pub fn generate_hightlight(conf: &mut Root<String>) -> Vec<(String,Highlight)>{
             let mut sub_result: (String,Highlight) = (root.name.to_string(),Highlight::None);
             if let Some(val) = root.get_value() {
                 sub_result.1 = match val.as_str() {
-                    "json" => Highlight::Incl(btel::InclHighlight::Json),
-                    "rust" => Highlight::Incl(btel::InclHighlight::Rust),
+                    "json" => Highlight::Incl(crate::InclHighlight::Json),
+                    "rust" => Highlight::Incl(crate::InclHighlight::Rust),
                     "custom" => generate_custom(root),
                     _ => Highlight::None
                 }

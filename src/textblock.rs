@@ -1,12 +1,19 @@
+use crate::view::ViewRule;
 pub struct TextBlock {
     pub input: Vec<Vec<char>>,
     pub vert_cursor: usize,
     pub edit_cursor: usize,
     pub saved: bool,
+    pub view: Vec<Vec<char>>,
+    pub view_info: Vec<(usize,ViewRule)>
+}
+pub enum Target {
+    Input,
+    View
 }
 impl TextBlock {
     pub fn new() -> TextBlock {
-        TextBlock { input: vec![Vec::new()], vert_cursor: 0, edit_cursor: 0, saved: true }
+        TextBlock { input: vec![Vec::new()], vert_cursor: 0, edit_cursor: 0, saved: true,view: vec![Vec::new()],view_info: Vec::new()}
     }
     pub fn write(&mut self, x: char) {
             self.input[self.vert_cursor].insert(self.edit_cursor, x);
@@ -53,35 +60,51 @@ impl TextBlock {
         self.edit_cursor = 0;
         self.saved = false
     }
-    pub fn left(&mut self) {
+    pub fn left(&mut self,target: Target) {
+        let target = match target {
+            Target::View => &self.view,
+            Target::Input => &self.input
+        };
         if self.edit_cursor != 0 {
             self.edit_cursor -= 1
         } else if self.vert_cursor != 0 {
             self.vert_cursor -= 1;
-            self.edit_cursor = self.input[self.vert_cursor].len()
+            self.edit_cursor = target[self.vert_cursor].len()
         }
     }
-    pub fn right(&mut self) {
-        if self.edit_cursor + 1 <= self.input[self.vert_cursor].len() {
+    pub fn right(&mut self,target: Target) {
+        let target = match target {
+            Target::View => &self.view,
+            Target::Input => &self.input
+        };
+        if self.edit_cursor + 1 <= target[self.vert_cursor].len() {
             self.edit_cursor += 1
-        } else if self.vert_cursor + 1 != self.input.len() {
+        } else if self.vert_cursor + 1 != target.len() {
             self.vert_cursor += 1;
             self.edit_cursor = 0
         }
     }
-    pub fn up(&mut self) {
+    pub fn up(&mut self,target: Target) {
+        let target = match target {
+            Target::View => &self.view,
+            Target::Input => &self.input
+        };
         if self.vert_cursor != 0 {
             self.vert_cursor -= 1;
-            if self.input[self.vert_cursor].len() < self.edit_cursor + 2 {
-                self.edit_cursor = self.input[self.vert_cursor].len()
+            if target[self.vert_cursor].len() < self.edit_cursor + 2 {
+                self.edit_cursor = target[self.vert_cursor].len()
             }
         }
     }
-    pub fn down(&mut self) {
-        if self.vert_cursor + 2 <= self.input.len() {
+    pub fn down(&mut self,target: Target) {
+        let target = match target {
+            Target::View => &self.view,
+            Target::Input => &self.input
+        };
+        if self.vert_cursor + 2 <= target.len() {
             self.vert_cursor += 1;
-            if self.input[self.vert_cursor].len() < self.edit_cursor + 2 {
-                self.edit_cursor = self.input[self.vert_cursor].len()
+            if target[self.vert_cursor].len() < self.edit_cursor + 2 {
+                self.edit_cursor = target[self.vert_cursor].len()
             }
         }
     }

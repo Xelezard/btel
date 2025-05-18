@@ -1,13 +1,16 @@
-use std::fmt;
+use std::{env, fmt, fs};
 use regex::Regex;
 use tui::{style::Color, widgets::BorderType};
 pub mod textblock;
+pub mod view;
+pub mod highlight;
 #[derive(Clone, Copy,Debug,PartialEq)]
 pub enum Mode {
     Edit,
     Quit,
     Find(usize,usize),
-    Command
+    Command,
+    View
 }
 impl Mode {
     pub fn from_string(string: &String) -> Mode {
@@ -16,6 +19,7 @@ impl Mode {
             "Quit" => Mode::Quit,
             "Find" => Mode::Find(0, 0),
             "Command" => Mode::Command,
+            "View" => Mode::View,
             _ => panic!("")
         }
     }
@@ -26,7 +30,8 @@ impl fmt::Display for Mode {
             Mode::Edit => "Edit",
             Mode::Command => "Command",
             Mode::Find(_, _) => "Find",
-            Mode::Quit => "Quit"
+            Mode::Quit => "Quit",
+            Mode::View => "View"
         })
     }
 }
@@ -57,6 +62,7 @@ pub enum BtelCommand {
     Open,
     Save,
     Help,
+    View,
     Extern(String)
 }
 pub struct App<'a>{
@@ -148,4 +154,46 @@ pub fn btel_path() -> String{
 #[cfg(target_os = "windows")]
 pub fn btel_path() -> String{
     format!("{}/.btel",std::env::var("AppData").unwrap())
+}
+pub fn open(command: &String) -> Option<Vec<String>>{
+    let command = trim_home(command);
+    let file_option = fs::read_to_string(command);
+    if let Ok(file) = file_option {
+        let file = file.replace("\t", "    ");
+        let split:Vec<&str> = file.split("\n").collect();
+        let s: Vec<String> = split.iter().map(|f|f.to_string()).collect();
+        return Some(s);
+    }
+    None
+ }
+pub fn open_folder(command: &String) -> Option<String>{
+    let command = trim_home(command);
+    if std::path::Path::new(&command).is_dir() {
+        let mut new_command = command.to_string();
+        if !command.contains(std::env::current_dir().unwrap().to_str().unwrap()) && !command.starts_with("/") {
+            new_command = format!("{}/{}",std::env::current_dir().unwrap().to_str().unwrap(),command.to_string());
+        }
+        if new_command.ends_with("..") {
+            let new = new_command.split("/").collect::<Vec<&str>>().iter().rev().collect::<Vec<&&str>>().iter().skip(2).rev().map(|c|c.to_string()).collect::<Vec<String>>().join("/");
+            new_command = new;
+        } 
+        if new_command.ends_with(".") {
+            new_command.remove(new_command.len()-1);
+            new_command.remove(new_command.len()-1);
+        }
+        if new_command == String::new() {
+            return None;
+        }
+        env::set_current_dir(&new_command).unwrap();
+        return Some(new_command.to_owned());
+    }
+    None
+}
+#[cfg(target_os = "linux")]
+fn trim_home(command: &String) -> String{
+    command.replace("~", &format!("{}",std::env::var("HOME").unwrap_or("~".to_string())))
+}
+#[cfg(target_os = "windows")]
+fn trim_home(command: &String) -> String {
+    command.to_string()
 }
