@@ -45,10 +45,10 @@ impl TextBlock {
             if self.edit_cursor + 1 == self.input[self.vert_cursor].len() {
                 let _ = self.input[self.vert_cursor].pop();
             } else {
-                let _ = self.input[self.vert_cursor].remove(self.edit_cursor + 1);
+                let _ = self.input[self.vert_cursor].remove(self.edit_cursor);
             }
         } else if self.vert_cursor + 1 != self.input.len() {
-            let mut rest = self.input.remove(self.vert_cursor + 1);
+            let mut rest = self.input.remove(self.vert_cursor+ 1);
             self.input[self.vert_cursor].append(&mut rest)
         }
         self.saved = false

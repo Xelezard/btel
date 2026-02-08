@@ -4,7 +4,7 @@ use tui::{
     backend::CrosstermBackend, style::{Color, Modifier, Style}, text::{Span, Spans}, widgets::{Block, Borders ,Tabs}, Terminal
 };
 use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind}, execute, terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen}
+    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind}, execute, terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode}
 };
 use btel::{view::action, *};
 use tui::widgets::BorderType;
