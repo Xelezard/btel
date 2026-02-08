@@ -101,7 +101,18 @@ fn run(terminal:&mut Terminal<CrosstermBackend<io::Stdout>>,config_tree: &mut Ro
                         match key.code {
                             KeyCode::Char(x) => {command += &x.to_string();},
                             KeyCode::Backspace => {let _ = command.pop();},
-                            KeyCode::Enter if !targets_folder => {exc_command(&mut command,&mut output,&mut mode,&mut display,&mut textbox,&mut file_name,&mut line_name,&commands,&mut scroll_x,&mut scroll_y,&mut opened_folder,&mut files_in_folder,&mut folder_error,&mut forced_save);hist_cursor = 0;if command != String::new() {history.push(command)}command = String::new();},
+                            KeyCode::Enter if !targets_folder => {
+                                exc_command(&mut command,&mut output,&mut mode,&mut display,&mut textbox,&mut file_name,&mut line_name,&commands,&mut scroll_x,&mut scroll_y,&mut opened_folder,&mut files_in_folder,&mut folder_error,&mut forced_save);hist_cursor = 0;if command != String::new() {history.push(command)}command = String::new();
+                                if mode == Mode::View {
+                                    let enabled = config_tree.get_child("view-mode")?;
+                                    let enabled = enabled.get_value().ok_or(std::fmt::Error::default())?;
+                                    let enabled = enabled.as_str() == "on";
+                                    if !enabled {
+                                        mode = Mode::Command;
+                                        line_name = String::from("View mode disabled. Set 'view-mode' to 'on' in the configuration.")
+                                    }
+                                }
+                            },
                             KeyCode::Esc => {command = String::new();},
                             KeyCode::Up if !targets_folder => {if hist_cursor + 1 < history.len() {hist_cursor += 1;command = get_from_history(history, &hist_cursor)} else {command = String::new();hist_cursor = 0}},
                             KeyCode::Down if !targets_folder => {if hist_cursor > 0 {hist_cursor -= 1;command = get_from_history(history, &hist_cursor)}else {command = String::new()}},
@@ -109,7 +120,7 @@ fn run(terminal:&mut Terminal<CrosstermBackend<io::Stdout>>,config_tree: &mut Ro
                             KeyCode::Up => {if folder_cursor > 0 {folder_cursor -= 1} else {folder_cursor = files_in_folder.len() - 1}},
                             KeyCode::Right => {if let Some(_) = opened_folder {targets_folder = false}},
                             KeyCode::Left => {if let Some(_) = opened_folder {targets_folder = true}},
-                            KeyCode::Enter => {exc_command(&mut format!("o {}/{}", opened_folder.as_ref().unwrap(),files_in_folder[folder_cursor]),&mut output,&mut mode,&mut display,&mut textbox,&mut file_name,&mut line_name,&commands,&mut scroll_x,&mut scroll_y,&mut opened_folder,&mut files_in_folder,&mut folder_error,&mut forced_save)},
+                            KeyCode::Enter => {exc_command(&mut format!("o {}/{}", opened_folder.as_ref().unwrap(),files_in_folder[folder_cursor]),&mut output,&mut mode,&mut display,&mut textbox,&mut file_name,&mut line_name,&commands,&mut scroll_x,&mut scroll_y,&mut opened_folder,&mut files_in_folder,&mut folder_error,&mut forced_save);},
                             _ => ()
                         }
                     },
@@ -136,17 +147,18 @@ fn run(terminal:&mut Terminal<CrosstermBackend<io::Stdout>>,config_tree: &mut Ro
                         KeyCode::Tab => textbox.tab(),
                         _ => ()
                     },
-                    Mode::View => match key.code {
-                        KeyCode::Char('e') => mode = Mode::Edit,
-                        KeyCode::Char('c') => mode = Mode::Command,
-                        KeyCode::Enter => action(&mut textbox,&mut file_name,&mut files_in_folder,&mut opened_folder,&mut line_name,&mut folder_error),
-                        KeyCode::Esc => {mode = Mode::Command;line_name = String::from("Command")},
-                        KeyCode::Left => textbox.left(textblock::Target::View),
-                        KeyCode::Right => textbox.right(textblock::Target::View),
-                        KeyCode::Up => textbox.up(textblock::Target::View),
-                        KeyCode::Down => textbox.down(textblock::Target::View),
-                        _ => ()
-                    },
+                    Mode::View => {
+                        match key.code {
+                            KeyCode::Char('e') => mode = Mode::Edit,
+                            KeyCode::Char('c') => mode = Mode::Command,
+                            KeyCode::Enter => action(&mut textbox,&mut file_name,&mut files_in_folder,&mut opened_folder,&mut line_name,&mut folder_error),
+                            KeyCode::Esc => {mode = Mode::Command;line_name = String::from("Command")},
+                            KeyCode::Left => textbox.left(textblock::Target::View),
+                            KeyCode::Right => textbox.right(textblock::Target::View),
+                            KeyCode::Up => textbox.up(textblock::Target::View),
+                            KeyCode::Down => textbox.down(textblock::Target::View),
+                            _ => ()
+                    }},
                     Mode::Quit => if textbox.saved {return Ok(())} else {mode = Mode::Command;line_name = String::from("Unsaved changes use fs to force the saved state")},
                 }
             }

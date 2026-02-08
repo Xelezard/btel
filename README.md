@@ -41,7 +41,9 @@ close the command block and enter the edit mode
 to go back press esc
 
 #### view or v
-close the command block and enter the view mode
+close the command block and enter the view mode if enabled in the config
+
+> view-mode -> off #change to on
 
 view mode is like edit mode but you can't edit anything
 
